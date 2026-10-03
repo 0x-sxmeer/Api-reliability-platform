@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>API Reliability Platform — Master Reference</title>
+<style>
+:root{
+  --bg:#faf9f6; --surface:#ffffff; --ink:#1a1917; --ink-soft:#66605a; --ink-faint:#948d84;
+  --line:#e6e1d8; --line-soft:#f0ece3;
+  --accent:#2f5d50; --accent-ink:#1e4038; --accent-soft:#e6efe9; --accent-line:#bcd7c9;
+  --amber:#9a5b23; --amber-soft:#f7ecdf; --amber-line:#e8c99a;
+  --rose:#8c3a3a; --rose-soft:#f6e9e7; --rose-line:#e3bcbc;
+  --blue:#2c4f78; --blue-soft:#e8eef6; --blue-line:#b9cce3;
+  --code-bg:#f1efe7;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141312; --surface:#1c1b19; --ink:#eeece7; --ink-soft:#aca69d; --ink-faint:#77716a;
+    --line:#332f28; --line-soft:#252320;
+    --accent:#7cb69f; --accent-ink:#a8d4c0; --accent-soft:#1c2b26; --accent-line:#2e4a40;
+    --amber:#dba05e; --amber-soft:#2c2318; --amber-line:#4d3a24;
+    --rose:#d99898; --rose-soft:#2b1f1e; --rose-line:#4a3230;
+    --blue:#8fb3d9; --blue-soft:#1a2634; --blue-line:#2d4460;
+    --code-bg:#211f1c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141312; --surface:#1c1b19; --ink:#eeece7; --ink-soft:#aca69d; --ink-faint:#77716a;
+  --line:#332f28; --line-soft:#252320;
+  --accent:#7cb69f; --accent-ink:#a8d4c0; --accent-soft:#1c2b26; --accent-line:#2e4a40;
+  --amber:#dba05e; --amber-soft:#2c2318; --amber-line:#4d3a24;
+  --rose:#d99898; --rose-soft:#2b1f1e; --rose-line:#4a3230;
+  --blue:#8fb3d9; --blue-soft:#1a2634; --blue-line:#2d4460;
+  --code-bg:#211f1c;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.62;-webkit-font-smoothing:antialiased;height:100%;}
+html{height:100%;}
+
+/* ===== Layout shell ===== */
+.shell{display:flex; max-width:1180px; margin:0 auto;}
+.side{
+  width:248px; flex-shrink:0; position:sticky; top:0; align-self:flex-start;
+  height:100vh; overflow-y:auto; padding:32px 20px 40px 28px;
+  border-right:1px solid var(--line);
+}
+.side::-webkit-scrollbar{width:6px;}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+.brand{font-family:var(--mono); font-size:11px; letter-spacing:.04em; color:var(--ink-faint); margin-bottom:4px;}
+.brand-title{font-family:var(--serif); font-size:1.15rem; margin:0 0 28px; line-height:1.3;}
+.side nav{font-size:13px;}
+.side .grp{margin-bottom:22px;}
+.side .grp-label{font-family:var(--mono); font-size:10px; letter-spacing:.05em; color:var(--ink-faint); margin-bottom:8px;}
+.side a{display:block; color:var(--ink-soft); text-decoration:none; padding:4px 0; border-left:2px solid transparent; padding-left:10px; margin-left:-10px;}
+.side a:hover{color:var(--ink);}
+.side a.active{color:var(--accent-ink); border-left-color:var(--accent); font-weight:600;}
+.progress-track{height:3px; background:var(--line-soft); border-radius:2px; margin-top:24px; overflow:hidden;}
+.progress-fill{height:100%; background:var(--accent); width:0%; transition:width .1s;}
+.progress-label{font-size:10.5px; color:var(--ink-faint); font-family:var(--mono); margin-top:6px;}
+
+.main{flex:1; min-width:0; padding:0 48px 140px;}
+@media (max-width:920px){
+  .side{display:none;}
+  .main{padding:0 20px 100px;}
+}
+
+/* ===== Hero ===== */
+header.hero{padding:56px 0 40px; border-bottom:1px solid var(--line); margin-bottom:8px;}
+.hero-kicker{font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--ink-faint); margin-bottom:18px; display:flex; align-items:center; gap:10px;}
+.hero-kicker .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);}
+h1.title{font-family:var(--serif); font-weight:400; font-size:2.7rem; line-height:1.14; margin:0 0 20px; letter-spacing:-.015em; max-width:16ch;}
+.hero-lede{font-size:1.1rem; color:var(--ink-soft); max-width:56ch; margin:0 0 28px;}
+.hero-stats{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:6px; overflow:hidden; margin-top:8px;}
+.hero-stat{background:var(--surface); padding:16px 14px;}
+.hero-stat .n{font-family:var(--serif); font-size:1.5rem; display:block; color:var(--accent-ink);}
+.hero-stat .d{font-size:11px; color:var(--ink-faint); margin-top:2px; line-height:1.3;}
+@media (max-width:700px){.hero-stats{grid-template-columns:repeat(2,1fr);} h1.title{font-size:2.1rem;}}
+
+/* ===== Sections ===== */
+.part{padding-top:56px;}
+.part-label{font-family:var(--mono); font-size:11.5px; color:var(--accent-ink); letter-spacing:.04em; margin-bottom:10px;}
+h2{font-family:var(--serif); font-weight:400; font-size:1.7rem; margin:0 0 8px; letter-spacing:-.01em;}
+.part-dek{color:var(--ink-soft); font-size:15px; max-width:62ch; margin:0 0 28px;}
+h3{font-size:1.05rem; font-weight:700; margin:32px 0 12px;}
+h4{font-size:.95rem; font-weight:700; margin:0 0 6px;}
+p{margin:0 0 15px; max-width:70ch;}
+ul,ol{margin:0 0 16px; padding-left:22px; max-width:70ch;}
+li{margin-bottom:7px;}
+strong{font-weight:700;}
+hr.rule{border:none; border-top:1px solid var(--line); margin:48px 0;}
+
+/* ===== Pills / badges ===== */
+.pill-row{display:flex; gap:8px; flex-wrap:wrap; margin:18px 0;}
+.pill{font-family:var(--mono); font-size:11px; border:1px solid var(--line); border-radius:20px; padding:5px 13px; color:var(--ink-soft); background:var(--surface);}
+
+/* ===== Cards ===== */
+.card{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:22px 24px; margin:16px 0;}
+.card-head{display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:10px; flex-wrap:wrap;}
+.card-head h4{font-size:16px; margin:0;}
+.tag{font-family:var(--mono); font-size:10px; letter-spacing:.02em; padding:3px 10px; border-radius:10px; white-space:nowrap; border:1px solid transparent;}
+.tag-high{background:var(--rose-soft); color:var(--rose); border-color:var(--rose-line);}
+.tag-med{background:var(--amber-soft); color:var(--amber); border-color:var(--amber-line);}
+.tag-info{background:var(--blue-soft); color:var(--blue); border-color:var(--blue-line);}
+.tag-solved{background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent-line);}
+.card p{font-size:14.5px; margin:0 0 10px;}
+.card .fix{font-size:13.5px; color:var(--ink-soft); border-top:1px dashed var(--line); padding-top:10px; margin-top:10px;}
+.card .fix b{color:var(--ink);}
+
+/* ===== Finding blocks ===== */
+.finding{background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:3px; padding:18px 22px; margin:20px 0;}
+.finding .label{font-family:var(--mono); font-size:11px; color:var(--accent-ink); letter-spacing:.03em; margin-bottom:8px; font-weight:600;}
+.warn{background:var(--amber-soft); border:1px solid var(--amber-line); border-radius:6px; padding:16px 20px; margin:20px 0; font-size:14.5px;}
+.warn .label{color:var(--amber); font-family:var(--mono); font-size:11px; margin-bottom:6px; font-weight:600;}
+
+/* ===== Stat grid ===== */
+.stat-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin:22px 0; border-radius:6px; overflow:hidden;}
+.stat{background:var(--surface); padding:18px 20px;}
+.stat .n{font-family:var(--serif); font-size:1.6rem; display:block; line-height:1.1; color:var(--accent-ink);}
+.stat .d{font-size:12.5px; color:var(--ink-soft); margin-top:5px;}
+@media (max-width:560px){.stat-grid{grid-template-columns:1fr;}}
+
+/* ===== Tables ===== */
+.tbl-wrap{overflow-x:auto; margin:20px 0; border:1px solid var(--line); border-radius:6px;}
+table{width:100%; border-collapse:collapse; font-size:13.5px; min-width:480px;}
+th,td{text-align:left; padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top;}
+th{font-family:var(--mono); font-size:10.5px; color:var(--ink-faint); font-weight:600; letter-spacing:.02em; background:var(--line-soft);}
+tr:last-child td{border-bottom:none;}
+
+/* ===== Architecture diagram ===== */
+.diagram-box{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:24px; margin:22px 0; overflow-x:auto;}
+.diagram-box pre{border:none; background:none; margin:0; padding:0; font-size:12px; line-height:1.55; color:var(--ink);}
+
+/* ===== Module cards ===== */
+.module{border:1px solid var(--line); border-radius:8px; padding:20px 22px; margin:14px 0; background:var(--surface); position:relative;}
+.module .m-head{display:flex; align-items:center; gap:10px; margin-bottom:9px; flex-wrap:wrap;}
+.m-tier{font-family:var(--mono); font-size:10px; padding:3px 9px; border-radius:9px;}
+.m-tier.core{background:var(--blue-soft); color:var(--blue);}
+.m-tier.foundation{background:var(--accent-soft); color:var(--accent-ink);}
+.m-tier.surface{background:var(--amber-soft); color:var(--amber);}
+.module h4{margin:0; font-size:15.5px;}
+.module p{font-size:14px; margin:0 0 9px;}
+.module .solves{font-size:12.5px; color:var(--ink-faint); border-top:1px dashed var(--line); padding-top:9px;}
+.module .solves b{color:var(--ink-soft);}
+
+/* ===== Roadmap ===== */
+.roadmap-row{display:flex; gap:18px; padding:18px 0; border-top:1px solid var(--line);}
+.roadmap-row:first-of-type{border-top:none;}
+.roadmap-num{font-family:var(--serif); font-size:1.4rem; color:var(--accent-ink); min-width:34px; flex-shrink:0;}
+.roadmap-body h4{margin:0 0 5px; font-size:15px;}
+.roadmap-body p{margin:0; font-size:14px; color:var(--ink-soft);}
+
+/* ===== Code ===== */
+code{font-family:var(--mono); background:var(--code-bg); padding:1.5px 6px; border-radius:3px; font-size:.86em;}
+pre{background:var(--code-bg); border:1px solid var(--line); border-radius:6px; padding:16px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:16px 0;}
+pre code{background:none; padding:0;}
+
+/* ===== Source list ===== */
+.src-list{font-size:13px; color:var(--ink-soft); list-style:none; padding-left:0;}
+.src-list li{padding-left:18px; position:relative; margin-bottom:9px;}
+.src-list li::before{content:"—"; position:absolute; left:0; color:var(--ink-faint);}
+
+footer{border-top:1px solid var(--line); margin-top:64px; padding-top:24px; font-size:12.5px; color:var(--ink-faint);}
+a{color:var(--accent-ink);}
+::selection{background:var(--accent-soft);}
+
+/* Back to top */
+.top-link{position:fixed; bottom:24px; right:24px; background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:9px 16px; font-size:12px; font-family:var(--mono); color:var(--ink-soft); text-decoration:none; box-shadow:0 2px 10px rgba(0,0,0,.08); opacity:0; pointer-events:none; transition:opacity .2s;}
+.top-link.show{opacity:1; pointer-events:auto;}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <aside class="side" id="sidebar">
+    <div class="brand">MASTER REFERENCE</div>
+    <div class="brand-title">API Reliability &amp; Governance Platform</div>
+    <nav>
+      <div class="grp">
+        <div class="grp-label">ORIENTATION</div>
+        <a href="#overview">Overview</a>
+        <a href="#scope">Why the scope widened</a>
+      </div>
+      <div class="grp">
+        <div class="grp-label">THE PROBLEM</div>
+        <a href="#taxonomy">Problem taxonomy (6 categories)</a>
+        <a href="#security">Security deep-dive (OWASP)</a>
+        <a href="#llm-specifics">LLM provider specifics</a>
+        <a href="#cost">Cost governance crisis</a>
+        <a href="#matrix">Cross-cutting matrix</a>
+      </div>
+      <div class="grp">
+        <div class="grp-label">BEYOND LLMs</div>
+        <a href="#payments">Payments (Stripe)</a>
+        <a href="#messaging">Messaging / SMS (Twilio)</a>
+        <a href="#email">Email (SendGrid)</a>
+        <a href="#geo">Maps &amp; geo (Google Maps)</a>
+        <a href="#cloud">Cloud infra (AWS)</a>
+        <a href="#category-matrix">7th &amp; 8th categories</a>
+      </div>
+      <div class="grp">
+        <div class="grp-label">THE MARKET</div>
+        <a href="#existing-tools">Existing tools surveyed</a>
+        <a href="#gaps">Unclaimed gaps</a>
+      </div>
+      <div class="grp">
+        <div class="grp-label">THE SOLUTION</div>
+        <a href="#architecture">Architecture</a>
+        <a href="#modules">Module design</a>
+        <a href="#roadmap">Build roadmap</a>
+        <a href="#differentiation">Differentiation</a>
+      </div>
+      <div class="grp">
+        <div class="grp-label">REFERENCE</div>
+        <a href="#sources">Sources</a>
+      </div>
+    </nav>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0% read</div>
+  </aside>
+
+  <main class="main">
+
+    <header class="hero" id="overview">
+      <div class="hero-kicker"><span class="dot"></span>MASTER REFERENCE — CONSOLIDATED FROM TWO RESEARCH PASSES</div>
+      <h1 class="title">The complete case for a unified API reliability platform</h1>
+      <p class="hero-lede">Every failure mode, every cost, every existing tool, and the full architecture — organized into one document so you can build from it directly instead of cross-referencing two reports.</p>
+      <div class="hero-stats">
+        <div class="hero-stat"><span class="n">8</span><div class="d">problem categories mapped</div></div>
+        <div class="hero-stat"><span class="n">8+9</span><div class="d">providers &amp; tools surveyed</div></div>
+        <div class="hero-stat"><span class="n">4</span><div class="d">shared mechanisms that fix nearly everything</div></div>
+        <div class="hero-stat"><span class="n">9</span><div class="d">build phases, each independently shippable</div></div>
+      </div>
+    </header>
+
+    <section class="part" id="scope">
+      <div class="part-label">00 — ORIENTATION</div>
+      <h2>Why the scope widened</h2>
+      <p class="part-dek">The project started as "stop LLM API keys from hitting rate limits." Research kept surfacing the same failure shapes outside LLMs entirely — so the scope grew on purpose.</p>
+      <p>The first research pass treated this as an LLM-provider problem: OpenAI, Anthropic, Gemini, rate limits, retries, cost. That's real, but it's a subset. Looking at what actually breaks production integrations — accounting APIs, CRM APIs, payment APIs, webhooks, and LLM APIs alike — <strong>the same six failure categories recur everywhere</strong>, just with different vendor-specific details underneath.</p>
+      <p>So the project is reframed as: <strong>one platform, six problem categories, provider-specific adapters underneath.</strong> That's also the better product position — LLM-only reliability tools are a crowded market (see Section 07); a platform that treats LLM APIs as just one adapter type among many, alongside REST/SaaS/webhook integrations and API security, sits in a much less contested space.</p>
+      <div class="pill-row">
+        <span class="pill">LLM APIs</span><span class="pill">REST / SaaS APIs</span><span class="pill">Webhooks</span>
+        <span class="pill">Auth &amp; OAuth</span><span class="pill">API Security</span><span class="pill">Cost Governance</span>
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="taxonomy">
+      <div class="part-label">01 — THE PROBLEM</div>
+      <h2>The full problem taxonomy</h2>
+      <p class="part-dek">Six categories. Every "API issue" you'll ever hit falls into one of these.</p>
+
+      <div class="card">
+        <div class="card-head"><h4>1 · Rate limits &amp; capacity</h4><span class="tag tag-high">HIGH FREQUENCY</span></div>
+        <p>The provider caps how much you can call it, but the cap is often undocumented, inconsistent, or tied to a unit (key vs. project vs. org) you didn't expect. Google states Gemini limits explicitly "are not guaranteed." Groq enforces RPM, RPD, TPM, and TPD simultaneously — hit any one, get throttled. The same shape shows up outside LLMs: Xero access tokens expire after 30 minutes, and sync jobs on large accounts can outlive their own pagination cursor mid-run.</p>
+        <div class="fix"><b>What actually fixes it:</b> read live rate-limit headers on every response (not just on 429s), model the true limiting unit per provider, budget proactively instead of retrying reactively.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h4>2 · Silent failure &amp; degraded success</h4><span class="tag tag-high">HARDEST TO CATCH</span></div>
+        <p>A response comes back <code>200 OK</code> and is still wrong. Documented cases: an LLM grounding feature silently saying "I cannot find data" with no error code; webhook events delivered twice, out of order, or dropped with no alert — "your system doesn't receive the update and simply carries on with stale data. No alert. No error." This is the failure class every existing tool skips, because catching it requires knowing what a <em>correct</em> response looks like, not just what an error looks like.</p>
+        <div class="fix"><b>What actually fixes it:</b> schema/shape validation on every response against an expected contract; idempotency keys and sequence tracking on webhook consumption; a "known-bad-pattern" library per provider.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h4>3 · Schema &amp; contract drift</h4><span class="tag tag-med">SLOW-BURN</span></div>
+        <p>Fields get renamed, endpoints deprecated, response shapes shift — usually announced in a changelog nobody's watching. One documented real case: a field rename from <code>amount_outstanding</code> to <code>outstanding_balance</code> with no version bump, breaking a production dashboard. One case study found two engineers spending most of every sprint on this kind of drift by year two, despite shipping zero new features.</p>
+        <div class="fix"><b>What actually fixes it:</b> contract testing against a stored schema snapshot per provider/version; automated diffing on every response shape; alert on the first mismatched response, before it corrupts downstream data.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h4>4 · Authentication &amp; token lifecycle</h4><span class="tag tag-med">EDGE-CASE HEAVY</span></div>
+        <p>OAuth flows work in the demo and break in production edge cases: token expiry windows differ by provider (Xero: 30 min; QuickBooks: 60 min, with daily refresh-token rotation added in 2025), session expiry that "only surfaces in multi-tenant setups," and refresh races when concurrent requests try to renew the same expired token simultaneously.</p>
+        <div class="fix"><b>What actually fixes it:</b> a centralized token-refresh manager per provider, with locking so concurrent requests don't trigger duplicate refresh calls; provider-specific TTL configs instead of one assumed default.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h4>5 · Cost &amp; spend governance</h4><span class="tag tag-high">BIGGEST $ IMPACT</span></div>
+        <p>78% of AI teams exceed year-one cost projections; enterprise LLM spend rose 36% in a year despite falling token prices, because spend isn't attributed to a team or workflow until the invoice arrives. Not unique to LLMs — any pay-per-call API (SMS, geocoding, enrichment) has the same shape, just smaller numbers. Full detail in Section 04.</p>
+        <div class="fix"><b>What actually fixes it:</b> inline budget enforcement (reject/reroute before the call fires) at the key/team/customer level, not after-the-fact dashboards.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h4>6 · Security exposure</h4><span class="tag tag-high">HIGHEST STAKES</span></div>
+        <p>Distinct from the categories above — this isn't about calls failing, it's about calls <em>succeeding when they shouldn't</em>. Full breakdown in Section 02.</p>
+        <div class="fix"><b>What actually fixes it:</b> object-level and function-level authorization enforced at the gateway. See next section.</div>
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="security">
+      <div class="part-label">02 — THE PROBLEM</div>
+      <h2>Security deep-dive: OWASP API Top 10</h2>
+      <p class="part-dek">Two numbers make the case for treating this as core, not optional.</p>
+
+      <div class="stat-grid">
+        <div class="stat"><span class="n">~40%</span><div class="d">of all API attacks are Broken Object-Level Authorization (BOLA) — the single largest category</div></div>
+        <div class="stat"><span class="n">~80%</span><div class="d">of successful API attacks come from authenticated users exploiting missing object-level checks, not outsiders breaking in</div></div>
+      </div>
+
+      <div class="tbl-wrap">
+      <table>
+        <tr><th>Risk</th><th>Plain-language meaning</th><th>Gateway-layer mitigation</th></tr>
+        <tr><td>Broken Object-Level Auth (BOLA)</td><td>User A can access User B's data just by changing an ID in the request</td><td>Enforce object-level ownership checks at the gateway, not just in app code</td></tr>
+        <tr><td>Broken authentication</td><td>Tokens/keys can be forged, replayed, or guessed because of implementation mistakes</td><td>Reject unsigned/weakly-signed tokens at the edge; enforce TLS; never allow credentials in URL query params</td></tr>
+        <tr><td>Broken Object Property-Level Auth (BOPLA)</td><td>API returns more fields than needed, or lets a client set fields it shouldn't</td><td>Response field allow-listing per client/scope; strict request schema validation rejecting unexpected properties</td></tr>
+        <tr><td>Unrestricted resource consumption</td><td>No cap on calls, payload size, or cost per client — enables DoS and surprise bills</td><td>Same rate/budget enforcement layer as Categories 1 and 5, closing this OWASP risk too</td></tr>
+        <tr><td>Broken function-level auth</td><td>A regular user can call an admin-only endpoint because the endpoint only checks that <em>a</em> valid token was presented</td><td>Route-level RBAC/ABAC enforced centrally at the gateway, not trusted to be correct in every downstream service</td></tr>
+      </table>
+      </div>
+
+      <div class="finding">
+        <div class="label">WHY THIS BELONGS IN THE SAME PLATFORM</div>
+        <p>Rate-limiting infrastructure defends against both cost overruns (Category 5) <em>and</em> unrestricted resource consumption attacks (OWASP API4). A centralized auth/token layer (Category 4) is most of what's needed to fix broken authentication (OWASP API2). Building these as one platform means the enforcement logic is written once and serves both the reliability case and the security case.</p>
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="llm-specifics">
+      <div class="part-label">03 — THE PROBLEM</div>
+      <h2>LLM provider specifics</h2>
+      <p class="part-dek">Deep-dive on OpenAI, Anthropic, and Gemini — because they don't just have different numbers, they have different rate-limit architectures and different failure shapes.</p>
+
+      <div class="finding">
+        <div class="label">FINDING — SILENT DEGRADATION IS WORSE THAN OUTAGE</div>
+        <p>A large-scale study of 10,000+ production LLM calls found 5–15% of calls fail on first attempt — but the harder failures are the ones naive retry logic makes <em>worse</em>: a genuinely down provider (retrying into a black hole), a silently degraded model (retrying returns the same bad output), or an active rate limit (retrying accelerates the penalty).</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — OUTAGE NUMBERS ARE WORSE THAN THEY LOOK, AND GETTING WORSE</div>
+        <p>Independent incident tracking recorded 114 incidents affecting Claude in a 90-day window in early 2026, 30 major, median resolution 1h 9m — and Claude's 529 "Overloaded" rate climbed from 3.2% daily in June 2025 to 11.7% by September. Industry-wide, average API uptime fell from 99.66% to 99.46% between Q1 2024 and Q1 2025 — a 60% increase in downtime year-over-year.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — OPENAI AND ANTHROPIC FAIL DIFFERENTLY, NOT JUST DIFFERENTLY OFTEN</div>
+        <p>A peer-reviewed study (Vrije Universiteit Amsterdam) analyzing outage data across 8 services from both providers found: OpenAI's failures take longer to resolve but happen less often; Anthropic's happen more often but resolve faster; both show strong weekly/monthly periodicity; and OpenAI showed better failure isolation between components. A fallback strategy tuned for one provider's failure shape is the wrong strategy for the other.</p>
+      </div>
+
+      <div class="tbl-wrap">
+      <table>
+        <tr><th>Provider</th><th>Limiting unit</th><th>Signal quality</th><th>Key implication</th></tr>
+        <tr>
+          <td><strong>Anthropic (Claude)</strong></td>
+          <td>Per organization</td>
+          <td>Standard headers + distinct 529 overload signal</td>
+          <td>529 means the provider is capacity-constrained, not that you personally exceeded a quota — treat differently in retry logic than a 429.</td>
+        </tr>
+        <tr>
+          <td><strong>OpenAI</strong></td>
+          <td>Per organization/project</td>
+          <td>Standard headers, better failure isolation between services</td>
+          <td>Longer but rarer outages — "wait and retry with generous backoff" fits better here than for Anthropic.</td>
+        </tr>
+        <tr>
+          <td><strong>Google Gemini</strong></td>
+          <td><strong>Per project</strong>, tied to a usage tier that auto-changes with spend</td>
+          <td>No stable published numbers — Google says limits "are not guaranteed"</td>
+          <td>Your effective limit can change with no code change on your end. Cannot hard-code a Gemini limit and trust it.</td>
+        </tr>
+      </table>
+      </div>
+
+      <div class="warn">
+        <div class="label">THE MISTAKE THIS PREVENTS</div>
+        Both Anthropic and Gemini limit <em>above</em> the individual API key — org for Anthropic, project for Gemini. This directly undermines the most common DIY fix: key rotation/pooling. Spinning up five keys under the same org or project buys nothing, because the provider counts requests against the org/project, not the key. Verify per-provider before assuming key rotation helps.
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="cost">
+      <div class="part-label">04 — THE PROBLEM</div>
+      <h2>The cost-governance crisis</h2>
+      <p class="part-dek">A functionally separate crisis from reliability — and the one with the biggest dollar figures attached.</p>
+
+      <div class="stat-grid">
+        <div class="stat"><span class="n">78%</span><div class="d">of AI teams report LLM spend exceeded projections in year one</div></div>
+        <div class="stat"><span class="n">57%</span><div class="d">of enterprises still track AI cost with manual spreadsheets</div></div>
+        <div class="stat"><span class="n">5–30×</span><div class="d">more tokens consumed per task by agentic workflows vs. simple chat</div></div>
+        <div class="stat"><span class="n">$63k → $85.5k</span><div class="d">average monthly enterprise LLM spend, one year's rise (36%), despite falling token prices</div></div>
+      </div>
+
+      <p>The core finding: <strong>this is a governance problem, not a pricing problem.</strong> Token prices fell roughly 80% between 2025–2026, yet enterprise AI budgets grew from $1.2M to $7M annually over the same period — because nobody can attribute spend to a team, feature, or workflow in real time.</p>
+
+      <h3>The specific mechanisms that blow budgets</h3>
+      <ul>
+        <li><strong>Shared keys defeat attribution.</strong> Several teams calling through one key means no way to trace a spend spike back to its cause.</li>
+        <li><strong>Failed calls cost money too.</strong> An agent retrying three times pays three times — compounding the naive-retry problem from Section 03.</li>
+        <li><strong>Evaluator/critic loops silently multiply cost.</strong> A "just to check" second model call doubles spend invisibly unless tracked as its own line item.</li>
+        <li><strong>Detection lag is structural.</strong> Even good platforms check spend on an interval of minutes, so a fast runaway job can blow past a limit before the alert fires. Fix: set the enforced limit meaningfully below the true ceiling.</li>
+      </ul>
+
+      <div class="finding">
+        <div class="label">THE PATTERN THAT ACTUALLY WORKS</div>
+        <p>"A reporting tool tells you what you already spent; a gateway stops spend before it exceeds a budget." Per-key, per-team, and per-customer budget ceilings enforced <em>inline</em> — reject or reroute the call before it fires — is what separates a real solution from a nicer invoice.</p>
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="matrix">
+      <div class="part-label">05 — THE PROBLEM</div>
+      <h2>Cross-cutting matrix</h2>
+      <p class="part-dek">The single most useful finding from widening the research: the same four mechanisms fix almost everything above, regardless of category or provider.</p>
+      <div class="tbl-wrap">
+      <table>
+        <tr><th>Mechanism</th><th>Categories it fixes</th></tr>
+        <tr><td><strong>Live, per-provider rate/quota model</strong> (not static config)</td><td>Rate limits · Cost governance · Unrestricted resource consumption (security)</td></tr>
+        <tr><td><strong>Response contract validation</strong> (schema + sanity checks on every call)</td><td>Silent failure · Schema drift · Broken object property auth (security)</td></tr>
+        <tr><td><strong>Centralized token/credential lifecycle management</strong></td><td>Auth &amp; token lifecycle · Broken authentication (security)</td></tr>
+        <tr><td><strong>One unified event ledger</strong> (every call/webhook logged with outcome, cost, identity)</td><td>Cost attribution · Security audit trail · Debugging drift and silent failures after the fact</td></tr>
+      </table>
+      </div>
+      <p>This is the real basis for a professional architecture: four shared primitives, with provider-specific adapters plugged into each — not six separate feature silos.</p>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="payments">
+      <div class="part-label">05B — BEYOND LLMs</div>
+      <h2>Payments: Stripe</h2>
+      <p class="part-dek">Payments introduce a stake the other categories don't have: getting it wrong moves real money, twice.</p>
+
+      <div class="finding">
+        <div class="label">FINDING — IDEMPOTENCY ISN'T OPTIONAL HERE, IT'S THE WHOLE GAME</div>
+        <p>Every write operation accepts an <code>Idempotency-Key</code> header, and Stripe returns the same response for any duplicate request with the same key within 24 hours — this is table stakes specifically because a naive retry after a network timeout would otherwise double-charge a customer. This is the sharpest version of a pattern from Category 1 (rate limits): in most APIs, retrying a failed call is merely wasteful; in payments, retrying a failed call that actually succeeded server-side is a customer-facing incident.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — WEBHOOKS CAN OUTRUN YOUR OWN DATABASE STATE</div>
+        <p>Stripe retries failed webhook deliveries for up to 3 days with exponential backoff, and — separate from retries — can deliver the same event more than once even with no failure on your end. The production-grade pattern documented across multiple independent sources: verify the signature and enqueue the raw event immediately (under 100ms, no business logic in the handler), process asynchronously with an idempotency check against a stored <code>event.id</code>, and route persistent failures to a dead-letter queue after a fixed retry count. One documented pattern goes further: when a webhook payload says a subscription is <code>active</code>, the handler <em>refetches from the API rather than trusting the payload</em> — because out-of-order delivery means the payload can be stale even when the event itself is real.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — SOME FAILURES REQUIRE A HUMAN, PERIOD</div>
+        <p>Strong Customer Authentication (SCA/3DS), required for most EU card payments, involves an out-of-band step — the customer's bank sends an OTP, the customer approves on their phone. No amount of retry logic, fallback provider, or gateway cleverness closes this gap; an automated agent or backend job simply cannot complete it. This is a distinct failure mode from anything in Categories 1–6: not "the system failed," but "the system correctly requires a human and none is present."</p>
+      </div>
+
+      <div class="tbl-wrap">
+      <table>
+        <tr><th>Mechanism</th><th>What it prevents</th></tr>
+        <tr><td>Idempotency keys on every write</td><td>Double-charging on retry after timeout/network failure</td></tr>
+        <tr><td>Signature verification (<code>Stripe-Signature</code> header)</td><td>Forged webhook events being trusted as real</td></tr>
+        <tr><td>Refetch-over-payload on state-changing webhooks</td><td>Acting on stale data from an out-of-order delivery</td></tr>
+        <tr><td>Dead-letter queue after N retries</td><td>A permanently failing event silently vanishing instead of paging someone</td></tr>
+      </table>
+      </div>
+
+      <div class="warn">
+        <div class="label">GATEWAY IMPLICATION</div>
+        Payment-provider adapters need a capability the LLM/REST adapters don't: a hard <em>non-retryable</em> classification for "requires human interaction," distinct from "transient failure" and "permanent failure." Naively retrying an SCA-blocked payment isn't just wasteful — it will keep failing forever and can mask the fact that a customer is stuck waiting on their bank.
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="messaging">
+      <div class="part-label">05B — BEYOND LLMs</div>
+      <h2>Messaging &amp; SMS: Twilio</h2>
+      <p class="part-dek">A genuinely new failure mechanism shows up here that nothing in LLM or REST APIs prepares you for: the API can say "sent" while the message is silently killed one layer downstream.</p>
+
+      <div class="finding">
+        <div class="label">FINDING — "SENT" AND "DELIVERED" ARE DIFFERENT CLAIMS, AND THE GAP IS WHERE FAILURES HIDE</div>
+        <p>Twilio delivery failures almost always trace to one of three layers: the API accepts the message but the upstream carrier rejects it (specific error codes), the message is delivered but filtered by a carrier spam policy or the recipient's device, or the status-callback webhook configuration silently drops the failure notification. Carrier-level filtering is content- and pattern-based — certain keywords, URL shorteners, or high-velocity sending patterns get silently dropped by specific carriers, with no error surfaced to the sender at all. This is Category 2 (silent failure) at a new layer: not the provider's API lying to you, but a <em>third party downstream of the provider</em> silently discarding the message after the provider has already told you it succeeded.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — REGULATORY REGISTRATION IS A PREREQUISITE, NOT A CONFIGURATION OPTION</div>
+        <p>A2P 10DLC registration is required for business-to-consumer SMS to US recipients on standard long codes; unregistered traffic faces severe filtering or outright blocking, regardless of how clean the message content is. This isn't a bug to catch — it's a compliance gate that, if skipped, produces symptoms indistinguishable from a generic delivery problem unless you know to check registration status first.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — RATE LIMITS ARE MULTI-LAYERED IN A WAY THAT MIRRORS AWS, NOT GEMINI</div>
+        <p>Twilio enforces rate limits at both the individual phone-number level and the account level simultaneously — a customer with 8 long-code numbers has a per-number cap <em>and</em> a combined account-level cap, and messages queue (up to 4 hours' worth) rather than failing outright when a number's rate is exceeded. This is structurally close to the AWS pattern (Section 05E) — multiple simultaneous limiting scopes — rather than the single-scope-per-provider pattern seen in the three LLM providers surveyed earlier.</p>
+      </div>
+
+      <div class="tbl-wrap">
+      <table>
+        <tr><th>Failure layer</th><th>Looks like</th><th>Actually is</th></tr>
+        <tr><td>API-level</td><td>4xx/5xx error, immediate</td><td>Genuine request rejection — the only layer that behaves like a normal REST API</td></tr>
+        <tr><td>Carrier-level</td><td>"Sent" status, message never arrives, no error</td><td>Silent content/velocity/reputation filtering — invisible to the sending application entirely</td></tr>
+        <tr><td>Registration-level</td><td>Intermittent, pattern-dependent filtering that looks like carrier flakiness</td><td>Missing/incomplete A2P 10DLC registration — a compliance gate, not a technical fault</td></tr>
+      </table>
+      </div>
+
+      <div class="warn">
+        <div class="label">GATEWAY IMPLICATION</div>
+        A messaging adapter can't rely on the HTTP response alone to know whether a message actually landed — it needs to consume delivery-status webhooks as a second, asynchronous source of truth, and reconcile "the API accepted it" against "the carrier confirmed it" as two separate states in the ledger. This is a stronger version of the silent-success problem than anything in Category 2 as originally scoped.
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="email">
+      <div class="part-label">05B — BEYOND LLMs</div>
+      <h2>Email: SendGrid</h2>
+      <p class="part-dek">Email sharpens the same "API success ≠ real success" problem into its purest form: a 2xx response and a bounced, spam-foldered, or blocked message are both completely normal outcomes of the same call.</p>
+
+      <div class="stat-grid">
+        <div class="stat"><span class="n">17.5%</span><div class="d">of one 2026 sample's emails were routed to spam after a successful API delivery</div></div>
+        <div class="stat"><span class="n">3.7%</span><div class="d">failed to reach the recipient at all, despite API-level success</div></div>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — DELIVERABILITY IS A REPUTATION SYSTEM, NOT AN API CONTRACT</div>
+        <p>Inbox providers (Gmail, Outlook) score every message using signals entirely outside the sending API's control: domain reputation, authentication setup (SPF/DKIM/DMARC), and recipient engagement history. A technically perfect API call — valid auth, correct payload, 202 Accepted — can still land in spam or be silently blocked, because the decision is made by a system the sending platform doesn't control and can only influence indirectly.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — RATE LIMITS ARE DELIBERATELY UNDOCUMENTED AS FIXED NUMBERS</div>
+        <p>SendGrid returns three rate-limit headers on every response and a 429 on exhaustion, but publishes no committed per-endpoint or per-account numeric limit table — the example numbers shown in its own docs are explicitly illustrative, not guaranteed. This is the same shape as Gemini's "not guaranteed" stance (Section 03): a provider that expects clients to drive entirely off live headers rather than hard-coded assumptions. Separately, bounce and complaint rates can trigger ISP-level throttling of delivery, entirely independent of the documented API rate limit — a second, invisible throttle layer with no header to read at all.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — DEDICATED IP WARM-UP IS A TIME-BASED CONSTRAINT WITH NO API EQUIVALENT ELSEWHERE IN THIS SURVEY</div>
+        <p>New sending domains/IPs achieve dramatically lower inbox placement in their first week than warmed-up ones, and providers recommend a 4–6 week gradual warm-up period before full-volume sending. There is no "call the API correctly" fix for this — it's a constraint that exists purely in calendar time, regardless of code quality.</p>
+      </div>
+
+      <div class="warn">
+        <div class="label">GATEWAY IMPLICATION</div>
+        Email is the clearest case in this whole survey for why Category 2 (silent failure) needs to extend past the response body: real deliverability signal only arrives via a separate, asynchronous events API (bounces, complaints, opens) minutes to hours later. A gateway's Response Validator (Section 07) needs an explicit "pending outcome" state for providers like this — the initial response is provisional, not final, and the ledger has to be updated when the real signal arrives.
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="geo">
+      <div class="part-label">05B — BEYOND LLMs</div>
+      <h2>Maps &amp; geo: Google Maps Platform</h2>
+      <p class="part-dek">The cleanest rate-limit story in the whole survey — and a distinct cost-risk shape from every other category.</p>
+
+      <div class="finding">
+        <div class="label">FINDING — NO DAILY CAP MEANS NO NATURAL CEILING ON SPEND</div>
+        <p>Google removed quota-per-day limits for geocoding entirely — every request is billed individually on a pay-as-you-go basis, with the only throttle being a queries-per-minute rate limit (3,000 QPM / ~50 QPS for the Geocoding API specifically). This is the opposite risk shape from Gemini's tiered daily quotas (Section 03): there is no built-in circuit breaker on total spend at all unless the developer explicitly configures one in the console. A runaway loop here doesn't get rate-limited into safety — it just keeps billing.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — THE RATE LIMIT IS AT LEAST HONEST AND STABLE</div>
+        <p>Unlike Gemini's explicit "not guaranteed" stance, Google Maps documents a concrete, stable number (3,000 QPM, summing client-side and server-side calls) and a specific error response (<code>OVER_QUERY_LIMIT</code> / <code>OVER_DAILY_LIMIT</code>) rather than a silently degraded response. This is genuinely the easiest provider in this whole survey to build reliable retry logic against — the failure signal is unambiguous.</p>
+      </div>
+
+      <div class="tbl-wrap">
+      <table>
+        <tr><th>Provider</th><th>Spend ceiling exists by default?</th><th>Rate-limit clarity</th></tr>
+        <tr><td>Gemini (LLM)</td><td>Yes — tiered, but the tier itself is a moving target</td><td>Low — "not guaranteed," no fixed published numbers</td></tr>
+        <tr><td>Google Maps (geo)</td><td>No — pure pay-per-call unless manually capped</td><td>High — fixed, documented QPM with clear error codes</td></tr>
+      </table>
+      </div>
+
+      <div class="warn">
+        <div class="label">GATEWAY IMPLICATION</div>
+        The Budget Engine (Section 07) can't assume every provider self-limits total spend the way LLM providers' daily quotas implicitly do. For pay-per-call, no-daily-cap providers like Maps, inline budget enforcement isn't a nice-to-have cost optimization — it's the <em>only</em> ceiling that will ever exist unless the platform provides one.
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="cloud">
+      <div class="part-label">05B — BEYOND LLMs</div>
+      <h2>Cloud infrastructure: AWS</h2>
+      <p class="part-dek">The most granular limiting-unit story in the survey — and a sharp real-world case of two identical-looking errors needing opposite fixes.</p>
+
+      <div class="finding">
+        <div class="label">FINDING — RATE LIMITS STACK ACROSS FOUR INDEPENDENT SCOPES SIMULTANEOUSLY</div>
+        <p>AWS applies limits at account level, service level, resource level (e.g., individual Lambda concurrency), and region level, all at once and independently. This is the most granular version of the "limiting unit" problem identified in Section 03 (Gap 2 in the market survey): where Anthropic is org-scoped and Gemini is project-scoped, AWS requires modeling <em>four simultaneous scopes per call</em>, any one of which can be the actual bottleneck.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — TWO IDENTICAL-LOOKING 429s NEED OPPOSITE FIXES</div>
+        <p>On Amazon Bedrock specifically, a <code>ThrottlingException</code> (429) can mean either an account-quota rate limit (fixed by slowing down or requesting a quota increase) or, separately, a <code>ModelNotReadyException</code> — also a 429 — which means capacity is temporarily unavailable and is fixed by retrying, switching region, or using cross-region inference, not by requesting a quota increase at all. A monitoring setup that buckets both as generically "retryable" will waste a week requesting a limit increase for what was actually a capacity event. This is a concrete, documented instance of exactly the Category-1/Finding-4 problem from the original LLM research (naive retry logic misdiagnosing the failure type) — now confirmed outside the LLM-provider context entirely.</p>
+      </div>
+
+      <div class="finding">
+        <div class="label">FINDING — REGIONAL ENDPOINTS CAN BE A MITIGATION, NOT JUST A DEPLOYMENT CHOICE</div>
+        <p>For services like AWS STS, using regional endpoints instead of the global endpoint gives applications a separate throttling budget per region — meaning region selection is itself a rate-limit mitigation strategy, not merely a latency/compliance decision. Separately, spreading workloads across multiple AWS accounts via AWS Organizations is a documented, sanctioned way to multiply available throttling budget — the inverse of the LLM finding that key rotation doesn't help against org-scoped limits: here, <em>account</em> rotation genuinely does help, because AWS's account-level scope is the real limiting unit for many services.</p>
+      </div>
+
+      <div class="warn">
+        <div class="label">GATEWAY IMPLICATION</div>
+        This is the strongest confirmation of Gap 2 from the market survey (Section 06): "verify per-provider before assuming a scaling strategy works" isn't a minor caveat, it's load-bearing. The exact fix that fails for Anthropic/Gemini (spin up more credentials) is the exact fix that works for AWS — and the only way to know which applies is to have modeled that provider's real limiting unit(s) explicitly, per the Provider Adapter Interface's <code>getLimitingUnit()</code> contract (Section 07). AWS is also the clearest real-world argument for the Routing Engine needing per-error-code classification, not just per-status-code — <code>ThrottlingException</code> and <code>ModelNotReadyException</code> are both 429 and demand opposite responses.
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="category-matrix">
+      <div class="part-label">05B — BEYOND LLMs</div>
+      <h2>Two more categories, and what generalized</h2>
+      <p class="part-dek">Surveying payments, messaging, email, geo, and cloud infra against the original 6-category taxonomy: most of it held. Two things didn't fit, and became new categories.</p>
+
+      <div class="card">
+        <div class="card-head"><h4>Category 7 · Downstream/third-party silent loss</h4><span class="tag tag-high">NEW</span></div>
+        <p>Distinct from Category 2 (silent failure at the provider's own API). Here, the <em>provider's API correctly reports success</em>, and the loss happens at a third party downstream of the provider entirely — a carrier filtering an SMS, an inbox provider spam-foldering an email. The provider has no way to tell you this happened synchronously; it can only be discovered via a separate, asynchronous, often much-delayed status channel (delivery-status webhooks, bounce/complaint events).</p>
+        <div class="fix"><b>What actually fixes it:</b> the Response Validator's "pending outcome" state — treat the initial API response as provisional for these providers, and reconcile with a second, asynchronous truth source before marking the ledger entry as genuinely resolved.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h4>Category 8 · Irreducible human-in-the-loop steps</h4><span class="tag tag-high">NEW</span></div>
+        <p>Some failures aren't failures at all — they're a correct requirement for human action (SCA/3DS bank approval) that no amount of retry, fallback, or engineering can route around. Misclassifying this as a transient failure and retrying it endlessly wastes resources and can mask that a real person is stuck waiting.</p>
+        <div class="fix"><b>What actually fixes it:</b> a non-retryable, "awaiting human action" classification distinct from both transient and permanent failure — surfaced to the ledger and dashboard as its own state, not folded into an error count.</div>
+      </div>
+
+      <div class="tbl-wrap">
+      <table>
+        <tr><th>Original category (from Section 01)</th><th>Held up across payments/messaging/email/geo/cloud?</th><th>What changed</th></tr>
+        <tr><td>1 · Rate limits &amp; capacity</td><td>Yes — strongly confirmed</td><td>Widened: AWS needs 4 simultaneous scopes, not 1; Maps has no daily-cap ceiling at all</td></tr>
+        <tr><td>2 · Silent failure</td><td>Yes, but needed splitting</td><td>The "third-party downstream" variant (messaging, email) was distinct enough to become Category 7</td></tr>
+        <tr><td>3 · Schema/contract drift</td><td>Yes — Stripe's versioned, signed webhook events are the positive counterexample of doing this well</td><td>No change — confirms the fix (contract testing) rather than adding a new shape</td></tr>
+        <tr><td>4 · Auth &amp; token lifecycle</td><td>Yes</td><td>No new shape found in this round</td></tr>
+        <tr><td>5 · Cost governance</td><td>Yes — strongly confirmed</td><td>Maps' zero-default-ceiling case is the sharpest argument yet for inline enforcement</td></tr>
+        <tr><td>6 · Security exposure</td><td>Not directly tested this round</td><td>No new finding — OWASP research from Section 02 still stands</td></tr>
+        <tr><td><em>(new)</em> 7 · Downstream/third-party silent loss</td><td>—</td><td>New category, from messaging + email</td></tr>
+        <tr><td><em>(new)</em> 8 · Irreducible human-in-the-loop steps</td><td>—</td><td>New category, from payments (SCA/3DS)</td></tr>
+      </table>
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="existing-tools">
+      <div class="part-label">06 — THE MARKET</div>
+      <h2>Existing tools surveyed</h2>
+      <p class="part-dek">The project is additive, not a worse rebuild of something that already ships. Here's the current landscape.</p>
+      <div class="tbl-wrap">
+      <table>
+        <tr><th>Tool</th><th>Shape</th><th>Real strength</th><th>What it doesn't solve</th></tr>
+        <tr><td><strong>LiteLLM</strong></td><td>Open-source, self-hosted (Python)</td><td>Broadest provider coverage (100+); free; virtual keys, spend tracking, routing, caching in OSS core</td><td>Degrades above ~500 RPS on one instance, P99 latency climbs sharply; deep governance is enterprise-tier only</td></tr>
+        <tr><td><strong>Portkey</strong></td><td>Hosted + open-core gateway</td><td>Observability, guardrails, prompt versioning out of the box; SOC 2</td><td>Free tier capped at 10K requests/month; steeper setup</td></tr>
+        <tr><td><strong>OpenRouter</strong></td><td>Hosted model aggregator</td><td>Fastest path to "one key, many models"; 500+ models</td><td>Not a governance/reliability control plane — a marketplace with a unified API shape</td></tr>
+        <tr><td><strong>Bifrost</strong> (Maxim AI)</td><td>Open-source, Go</td><td>Inline spend enforcement at virtual-key/team/customer level, in the request path</td><td>Newer, smaller ecosystem; less battle-tested at extreme scale</td></tr>
+        <tr><td><strong>RouteLLM</strong></td><td>Research framework</td><td>Cost-aware model routing — ~95% of GPT-4 quality at 14% of calls to the expensive model, in their benchmark</td><td>Not a control plane; needs wrapping. Re-test the ratio on your own workload.</td></tr>
+        <tr><td><strong>Braintrust Gateway</strong></td><td>Hosted, observability-first</td><td>Every call becomes a structured trace with no added instrumentation code</td><td>Observability-centric, not primarily a reliability/failover product</td></tr>
+        <tr><td><strong>Key-rotation libraries</strong> (e.g. APIRotater)</td><td>Small OSS libraries</td><td>Simple, does one thing well</td><td>Useless against providers that limit above the key level — two of your three target LLM providers</td></tr>
+        <tr><td><strong>Kong / Azure API Management</strong></td><td>General API gateways</td><td>Strong on OWASP-style security for APIs you expose</td><td>Not built around LLM-specific failure shapes (silent degradation, provider rate-limit semantics)</td></tr>
+      </table>
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="gaps">
+      <div class="part-label">06 — THE MARKET</div>
+      <h2>The unclaimed gaps</h2>
+      <p class="part-dek">Cross-referencing tool capabilities against what actually hurts teams surfaces four concrete, buildable gaps.</p>
+
+      <div class="card">
+        <div class="card-head"><h4>Gap 1 · No tool distinguishes "wrong 200" from "correct 200"</h4><span class="tag tag-info">HIGH VALUE</span></div>
+        <p>Every surveyed tool handles HTTP-level failures well. None ship general-purpose output-quality validation as a first-class gateway feature — the schema-valid-but-semantically-wrong response still has to be caught per call site, per team.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h4>Gap 2 · No tool models "limiting unit" as a first-class concept</h4><span class="tag tag-info">SMALL &amp; BUILDABLE</span></div>
+        <p>Every gateway treats rate limits as a number on a key or rule. None explicitly model <em>where</em> a provider actually enforces its limit and warn when a topology (e.g. key rotation) can't help for that provider.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h4>Gap 3 · Fallback strategy is generic, not failure-shape-aware</h4><span class="tag tag-info">DEFENSIBLE</span></div>
+        <p>Every tool offers "fallback to provider B on error" as a blanket rule. None tune the backoff/retry/fallback curve to each provider's empirically different failure shape (Section 03).</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h4>Gap 4 · Reliability and cost governance live in separate tools</h4><span class="tag tag-info">ARCHITECTURAL</span></div>
+        <p>Reliability-focused tools and cost-governance platforms are mostly separate products with separate mental models, even though the underlying data — every request, its provider, its outcome, its token cost — is the same stream.</p>
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="architecture">
+      <div class="part-label">07 — THE SOLUTION</div>
+      <h2>The architecture</h2>
+      <p class="part-dek">Everything routes through one gateway. Provider adapters translate vendor quirks into a common shape; four core engines apply the shared mechanisms; one ledger captures everything.</p>
+
+      <div class="diagram-box">
+<pre>
+                        ┌─────────────────────────────┐
+   Your application  →  │        GATEWAY EDGE          │
+   (one client SDK,     │  auth check · schema guard    │
+    any language)       │  request-shape validation     │
+                        └───────────────┬───────────────┘
+                                        │
+              ┌─────────────────────────┼─────────────────────────┐
+              │                         │                         │
+      ┌───────▼───────┐        ┌────────▼────────┐       ┌────────▼────────┐
+      │ QUOTA ENGINE   │        │  ROUTING ENGINE  │       │  BUDGET ENGINE   │
+      │ live headers → │        │ failure-shape-   │       │ inline spend cap │
+      │ per-provider   │        │ aware fallback   │       │ per key/team/    │
+      │ limiting-unit  │        │ + retry policy   │       │ customer         │
+      │ model          │        │                  │       │                  │
+      └───────┬───────┘        └────────┬────────┘       └────────┬────────┘
+              │                         │                         │
+              └─────────────────────────┼─────────────────────────┘
+                                        │
+                              ┌─────────▼─────────┐
+                              │  PROVIDER ADAPTERS  │
+                              │  (one per vendor)    │
+                              │  OpenAI · Anthropic  │
+                              │  Gemini · Stripe ·    │
+                              │  HubSpot · Xero ·     │
+                              │  generic REST/webhook │
+                              └─────────┬─────────┘
+                                        │
+                              ┌─────────▼─────────┐
+                              │ RESPONSE VALIDATOR  │
+                              │ schema check ·       │
+                              │ known-bad-pattern     │
+                              │ check · contract      │
+                              │ drift diff            │
+                              └─────────┬─────────┘
+                                        │
+                              ┌─────────▼─────────┐
+                              │   UNIFIED LEDGER     │
+                              │ every call/webhook,   │
+                              │ outcome, cost,        │
+                              │ identity — one event  │
+                              │ stream                │
+                              └─────────┬─────────┘
+                                        │
+                        ┌───────────────┴───────────────┐
+                        │           DASHBOARD             │
+                        │ spend by team · failure rates    │
+                        │ by provider · live quota         │
+                        │ headroom · security audit trail  │
+                        └─────────────────────────────────┘
+</pre>
+      </div>
+
+      <p>Design principle: <strong>provider adapters are the only place vendor-specific knowledge lives.</strong> Everything above the adapter layer operates on one normalized internal event shape. Adding a new provider means writing one adapter, not touching four engines.</p>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="modules">
+      <div class="part-label">07 — THE SOLUTION</div>
+      <h2>Module-by-module design</h2>
+
+      <div class="module">
+        <div class="m-head"><span class="m-tier core">CORE</span><h4>Provider Adapter Interface</h4></div>
+        <p>A small contract every adapter implements: <code>parseRateLimitHeaders()</code>, <code>getLimitingUnit()</code> (key/project/org), <code>classifyError(response)</code> (rate-limit vs. overload vs. auth vs. genuine failure), <code>knownBadPatterns()</code> (provider-specific silent-failure signatures). Ship with OpenAI, Anthropic, Gemini adapters and a generic REST/OAuth2 adapter covering most SaaS APIs out of the box.</p>
+        <div class="solves"><b>Solves:</b> rate limits, silent failure, auth lifecycle — for any provider with an adapter.</div>
+      </div>
+
+      <div class="module">
+        <div class="m-head"><span class="m-tier core">CORE</span><h4>Quota Engine</h4></div>
+        <p>Maintains live, per-provider, per-scope budget state, updated from every response's headers — not a static config number. Exposes "headroom remaining" so routing can decide before firing a request, not just react after a 429.</p>
+        <div class="solves"><b>Solves:</b> rate limits — and directly prevents the "key rotation doesn't help against org/project-level limits" mistake.</div>
+      </div>
+
+      <div class="module">
+        <div class="m-head"><span class="m-tier core">CORE</span><h4>Routing &amp; Fallback Engine</h4></div>
+        <p>Per-provider backoff/retry/fallback curves tuned to each provider's measured failure shape (Anthropic: frequent-short vs. OpenAI: rare-long) rather than one generic policy. Fails over only when the adapter's failure classification says that's the right move.</p>
+        <div class="solves"><b>Solves:</b> rate limits, silent failure (by not compounding it), general uptime.</div>
+      </div>
+
+      <div class="module">
+        <div class="m-head"><span class="m-tier core">CORE</span><h4>Budget Engine</h4></div>
+        <p>Enforces spend ceilings <em>inline</em> — before the call fires — at key, team, and customer granularity. Ceilings set below the "true" limit to absorb detection-lag windows.</p>
+        <div class="solves"><b>Solves:</b> cost governance, unrestricted resource consumption (security).</div>
+      </div>
+
+      <div class="module">
+        <div class="m-head"><span class="m-tier core">CORE</span><h4>Response Validator</h4></div>
+        <p>Three checks on every response, not just errors: schema conformance, a per-provider library of known-bad "successful-looking failure" patterns, and a diff against the last-known-good shape to catch drift on day one instead of week six.</p>
+        <div class="solves"><b>Solves:</b> silent failure, schema drift — the two hardest-to-catch categories.</div>
+      </div>
+
+      <div class="module">
+        <div class="m-head"><span class="m-tier core">CORE</span><h4>Auth &amp; Token Lifecycle Manager</h4></div>
+        <p>Centralized refresh-token handling with per-provider TTL configs and locking so concurrent requests never trigger duplicate refresh races. Also enforces OWASP's authentication defenses: reject unsigned/weak tokens, enforce TLS, keep credentials out of URLs.</p>
+        <div class="solves"><b>Solves:</b> auth lifecycle, broken authentication (security).</div>
+      </div>
+
+      <div class="module">
+        <div class="m-head"><span class="m-tier core">CORE</span><h4>Policy / Authorization Layer</h4></div>
+        <p>Object-level and function-level access rules enforced at the gateway: which records a key/token may touch, which routes it may call. Where BOLA and broken function-level auth actually get closed.</p>
+        <div class="solves"><b>Solves:</b> BOLA, broken function-level auth, BOPLA (security).</div>
+      </div>
+
+      <div class="module">
+        <div class="m-head"><span class="m-tier foundation">FOUNDATION</span><h4>Unified Event Ledger</h4></div>
+        <p>One append-only event stream: every call and webhook, its provider, outcome, cost, latency, identity. Every other module reads from or writes to this. Also the security audit trail and the dashboard's source of truth.</p>
+        <div class="solves"><b>Solves:</b> cost attribution, debugging, audit/compliance — the foundation everything sits on.</div>
+      </div>
+
+      <div class="module">
+        <div class="m-head"><span class="m-tier surface">SURFACE</span><h4>Dashboard</h4></div>
+        <p>A read layer over the ledger: spend by team/feature, failure rates by provider, live quota headroom, security audit view. Built last, deliberately — should reflect real usage rather than a guess.</p>
+        <div class="solves"><b>Solves:</b> visibility across all six categories at once.</div>
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="roadmap">
+      <div class="part-label">07 — THE SOLUTION</div>
+      <h2>Build roadmap</h2>
+      <p class="part-dek">Nine phases, staged for one developer. Each is independently useful and demoable — never a pile of unusable code waiting on a later phase.</p>
+
+      <div class="roadmap-row">
+        <div class="roadmap-num">1</div>
+        <div class="roadmap-body"><h4>Unified Event Ledger + Anthropic adapter</h4><p>Nothing else can be tested without something to log calls against. Smallest possible working slice.</p></div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-num">2</div>
+        <div class="roadmap-body"><h4>Generalize the Provider Adapter Interface + OpenAI &amp; Gemini adapters</h4><p>Proves the adapter abstraction holds across genuinely different providers before building on top of it.</p></div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-num">3</div>
+        <div class="roadmap-body"><h4>Quota Engine</h4><p>Directly prevents the most common DIY mistake (naive key rotation); fully testable against the 3 existing adapters.</p></div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-num">4</div>
+        <div class="roadmap-body"><h4>Response Validator</h4><p>Gap 1 from the market survey — the least-solved problem that exists today. High differentiation value early.</p></div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-num">5</div>
+        <div class="roadmap-body"><h4>Routing &amp; Fallback Engine</h4><p>Now meaningful — uses real quota headroom and real validator classifications to decide, instead of guessing.</p></div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-num">6</div>
+        <div class="roadmap-body"><h4>Budget Engine</h4><p>Inline cost governance. By now the ledger has enough real event data to set sane default ceilings.</p></div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-num">7</div>
+        <div class="roadmap-body"><h4>Generic REST/OAuth2 adapter + Auth Lifecycle Manager</h4><p>The expansion beyond LLM APIs — proves the platform on a non-LLM provider (Stripe-shape or HubSpot-shape).</p></div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-num">8</div>
+        <div class="roadmap-body"><h4>Policy / Authorization Layer</h4><p>Security hardening, once there's real traffic and real identities flowing through the ledger to write policies against.</p></div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-num">9</div>
+        <div class="roadmap-body"><h4>Dashboard</h4><p>Built last on purpose — a read layer, more useful once real data exists from phases 1–8.</p></div>
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="differentiation">
+      <div class="part-label">07 — THE SOLUTION</div>
+      <h2>Why this beats bolting together existing tools</h2>
+      <ul>
+        <li><strong>LiteLLM / Portkey / OpenRouter</strong> solve routing and observability for LLM APIs specifically, well — but none extend to REST/SaaS/webhook integrations, and none treat security (OWASP) as part of the same system.</li>
+        <li><strong>Bifrost</strong> is the closest match on inline cost enforcement, but still LLM-scoped.</li>
+        <li><strong>General API management platforms</strong> (Kong, Azure API Management) solve the security/OWASP side well for APIs <em>you expose</em>, but aren't built around LLM-specific failure shapes.</li>
+        <li><strong>Nobody surveyed treats "the limiting unit differs by provider" as a first-class modeled concept</strong> — a genuine, buildable, defensible gap identified directly from primary-source rate-limit docs.</li>
+      </ul>
+      <p>The professional angle, in one sentence: <strong>this is the first platform to treat LLM reliability, general API integration reliability, and API security as one problem with shared infrastructure</strong>, instead of three tool categories a team has to wire together and reconcile themselves.</p>
+    </section>
+
+    <hr class="rule">
+
+    <section class="part" id="sources">
+      <div class="part-label">REFERENCE</div>
+      <h2>Sources</h2>
+      <ul class="src-list">
+        <li>Google AI for Developers — Gemini API rate limits documentation (ai.google.dev), retrieved Sept 2026</li>
+        <li>Groq Console — rate limits documentation (console.groq.com/docs/rate-limits)</li>
+        <li>Chu, Talluri, Lu, Iosup — "An Empirical Characterization of Outages and Incidents in Public Services for Large Language Models," Vrije Universiteit Amsterdam (arXiv:2501.12469)</li>
+        <li>FAILS framework paper — open-source incident analysis for LLM services (arXiv:2503.12185)</li>
+        <li>buildmvpfast.com — "Building with Unreliable AI: Error Handling &amp; Fallback Strategies," citing Uptrends' State of API Reliability 2025 and IsDown incident tracking, March 2026</li>
+        <li>Nordic APIs — API Reliability Report 2026</li>
+        <li>Atlan, CloudZero, Tokonomics, Compresr, getmaxim.ai (Bifrost/Maxim) — enterprise LLM cost management guides, 2026</li>
+        <li>Requesty, Wavect, Pinggy, FloTorch, Braintrust — LLM gateway comparison posts, 2026</li>
+        <li>OWASP API Security Top 10 (2023 revision) — via Zuplo, Salt Security, 42Crunch, Azure/Microsoft Learn, Azion</li>
+        <li>Apideck — "API Integration Challenges: What Actually Breaks at Scale," May 2026</li>
+        <li>Medium/Vovance — "7 Critical API Integration Challenges in 2026," March 2026</li>
+        <li>MojoAuth — Webhook vs API auth patterns, citing Postman's 2024 State of the API Report (40,000+ developers)</li>
+        <li>Extend.ai, Vipps MobilePay, HubSpot — real-world API versioning and webhook changelog documentation</li>
+        <li>Stripe webhook reliability: dev.to/instawebhook, buildmvpfast.com, theroadtoenterprise.com, freecodecamp.org, dev.to/supertrained — production idempotency/webhook patterns, 2025–2026</li>
+        <li>Twilio: official support docs (rate limits, MMS limits, sending/receiving limitations); myfollowup.io and buglyst.com — A2P 10DLC and carrier-filtering diagnostics, 2026</li>
+        <li>SendGrid: mailreach.co, mailmodo.com, mailtester.com deliverability studies; apis.io machine-readable rate-limit profile; official SendGrid support docs — all 2026</li>
+        <li>Google Maps Platform — official Geocoding/Geolocation/Maps JavaScript API usage-and-billing docs (developers.google.com), geocod.io and geoapify.com third-party analyses, sanborn.com scaling guide, 2026</li>
+        <li>AWS: official AWS Knowledge Center (SNS, Glue, IAM/STS throttling), AWS Cloud Operations Blog, dev.to/multigrid (Bedrock ThrottlingException deep-dive), oneuptime.com — 2026</li>
+      </ul>
+      <p style="font-size:12px; color:var(--ink-faint); margin-top:20px;">Vendor blog figures are directional, not exact — several sources cite the same underlying industry estimates without independent verification. The OWASP framework, primary provider documentation, and the VU Amsterdam academic study are the highest-confidence sources in this document.</p>
+    </section>
+
+    <footer>Compiled from live web research, September 2026 · Consolidated master reference, merging both prior research passes.</footer>
+
+  </main>
+</div>
+
+<a href="#overview" class="top-link" id="topLink">↑ top</a>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('.side nav a'));
+  var sections = links.map(function(l){ return document.querySelector(l.getAttribute('href')); }).filter(Boolean);
+  var fill = document.getElementById('progressFill');
+  var label = document.getElementById('progressLabel');
+  var topLink = document.getElementById('topLink');
+
+  function onScroll(){
+    var doc = document.documentElement;
+    var scrollTop = window.scrollY || doc.scrollTop;
+    var height = doc.scrollHeight - doc.clientHeight;
+    var pct = height > 0 ? Math.min(100, Math.round((scrollTop/height)*100)) : 0;
+    fill.style.width = pct + '%';
+    label.textContent = pct + '% read';
+    topLink.classList.toggle('show', scrollTop > 600);
+
+    var current = null;
+    var probe = scrollTop + 140;
+    for (var i=0;i<sections.length;i++){
+      if (sections[i] && sections[i].offsetTop <= probe) current = links[i];
+    }
+    links.forEach(function(l){ l.classList.remove('active'); });
+    if (current) current.classList.add('active');
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+})();
+</script>
+
+</body>
+</html>
