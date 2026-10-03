@@ -20,6 +20,7 @@ import pytest
 from gateway.adapters.anthropic import AnthropicAdapter
 from gateway.adapters.gemini import GeminiAdapter
 from gateway.adapters.openai import OpenAIAdapter
+from gateway.adapters.rest import GenericRestAdapter
 from gateway.core.adapter import AdapterRequest, ProviderAdapter
 from gateway.core.types import ErrorCategory, QuotaWindow
 
@@ -28,6 +29,7 @@ ADAPTERS: list[tuple[str, ProviderAdapter]] = [
     ("anthropic", AnthropicAdapter(api_key="test-key-not-used")),
     ("openai", OpenAIAdapter(api_key="test-key-not-used")),
     ("gemini", GeminiAdapter(api_key="test-key-not-used")),
+    ("generic_rest", GenericRestAdapter()),
 ]
 
 ADAPTER_IDS = [name for name, _ in ADAPTERS]

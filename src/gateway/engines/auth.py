@@ -4,9 +4,9 @@ Handles OAuth token lifecycle, refresh races, and credential security.
 """
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
-from typing import Callable, Awaitable
+from datetime import UTC, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class AuthLifecycleManager:
             state = self._tokens.get(key)
             
             # 60 second safety buffer before expiry
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             if not state or state.expires_at < now + timedelta(seconds=60):
                 logger.info("Refreshing token for %s", key)
                 old_refresh = state.refresh_token if state else None

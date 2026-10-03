@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from gateway.ledger.store import LedgerStore
+
 from gateway.engines.quota import Verdict
 from gateway.engines.validator import ValidationVerdict
+from gateway.ledger.store import LedgerStore
 
 if TYPE_CHECKING:
     from gateway.engines.router import RoutingOutcome
@@ -49,8 +49,8 @@ class BudgetEngine:
         """
         Check if the identity_key or global budget has been exceeded.
         """
-        now = datetime.now(timezone.utc)
-        start_of_month = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+        now = datetime.now(UTC)
+        start_of_month = datetime(now.year, now.month, 1, tzinfo=UTC)
         
         identity_budget = self._config.identity_monthly_usd.get(identity_key)
         global_budget = self._config.global_monthly_usd
@@ -61,8 +61,7 @@ class BudgetEngine:
         identity_spend = await self._ledger.sum_cost_since(since=start_of_month, identity_key=identity_key)
         
         # Check identity budget
-        if identity_budget is not None:
-            if identity_spend >= identity_budget:
+        if identity_budget is not None and identity_spend >= identity_budget:
                 return BudgetAssessment(
                     Verdict.BLOCKED, 
                     0.0, 
@@ -102,9 +101,11 @@ class BudgetEngine:
         for attempt in outcome.attempts:
             val = attempt.validation
             res = attempt.result
-            if val and val.was_billed:
-                if val.verdict in (ValidationVerdict.INVALID, ValidationVerdict.SUSPECT):
-                    if res and res.event.cost_usd is not None:
+            if (
+                val and val.was_billed
+                and val.verdict in (ValidationVerdict.INVALID, ValidationVerdict.SUSPECT)
+                and res and res.event.cost_usd is not None
+            ):
                         wasted_usd += res.event.cost_usd
                         
         if wasted_usd > 0:

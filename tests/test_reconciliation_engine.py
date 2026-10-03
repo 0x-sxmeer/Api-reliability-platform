@@ -3,13 +3,14 @@ Unit tests for the Reconciliation Engine (Phase 7).
 """
 from __future__ import annotations
 
-import pytest
 from uuid import uuid4
 
+import pytest
+
 from gateway.core.types import CallOutcome, ErrorCategory
+from gateway.engines.reconcile import ReconciliationEngine
 from gateway.ledger.events import GatewayEvent
 from gateway.ledger.store import SqliteLedgerStore
-from gateway.engines.reconcile import ReconciliationEngine
 
 
 @pytest.mark.asyncio
