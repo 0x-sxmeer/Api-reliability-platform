@@ -59,13 +59,21 @@ async def lifespan(app: FastAPI):
         config=RoutingConfig(max_total_attempts=5)
     )
     
-    openai_adapter = OpenAIAdapter(api_key="mock")
+    # Provider credentials come from the environment at deploy time.
+    # Default to "mock" so local dev / test boots never crash; production
+    # deployments must set OPENAI_API_KEY / ANTHROPIC_API_KEY (and any
+    # future per-vendor keys) — vendor-specific knowledge stays in adapters,
+    # the server only reads generic env vars here.
+    openai_api_key = os.getenv("OPENAI_API_KEY", "mock")
+    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "mock")
+
+    openai_adapter = OpenAIAdapter(api_key=openai_api_key)
     quota_engine.register(openai_adapter)
     openai_target = RoutingTarget(
         adapter=openai_adapter,
         executor=CallExecutor(adapter=openai_adapter, ledger=ledger, identity_key="default")
     )
-    anthropic_adapter = AnthropicAdapter(api_key="mock")
+    anthropic_adapter = AnthropicAdapter(api_key=anthropic_api_key)
     quota_engine.register(anthropic_adapter)
     anthropic_target = RoutingTarget(
         adapter=anthropic_adapter,

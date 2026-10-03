@@ -12,3 +12,4 @@ gateway.db
 .ruff_cache/
 .coverage
 htmlcov/
+.env
