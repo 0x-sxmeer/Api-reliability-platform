@@ -7,8 +7,6 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 
-from gateway.core.adapter import AdapterRequest
-
 logger = logging.getLogger(__name__)
 
 class PolicyVerdict(str, Enum):
@@ -35,11 +33,13 @@ class PolicyConfig:
     policies: dict[str, list[OperationPolicy]] = field(default_factory=dict)
     default_deny: bool = True
 
-from gateway.ledger.store import LedgerStore
-from gateway.ledger.events import GatewayEvent
-from gateway.core.types import CallOutcome, ErrorCategory
-from datetime import datetime, timezone
 import uuid
+from datetime import UTC, datetime
+
+from gateway.core.types import CallOutcome, ErrorCategory
+from gateway.ledger.events import GatewayEvent
+from gateway.ledger.store import LedgerStore
+
 
 class PolicyEngine:
     """
@@ -84,7 +84,7 @@ class PolicyEngine:
             # Write to ledger immediately for security audit trail
             event = GatewayEvent(
                 event_id=uuid.uuid4(),
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 identity_key=identity_key,
                 provider=provider,
                 operation=operation,

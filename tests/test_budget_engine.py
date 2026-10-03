@@ -5,16 +5,14 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from datetime import datetime, timezone
 
 from gateway.core.types import CallOutcome
+from gateway.engines.budget import BudgetConfig, BudgetEngine
 from gateway.engines.quota import Verdict
 from gateway.engines.router import AttemptRecord, RoutingOutcome
-from gateway.engines.budget import BudgetAssessment, BudgetConfig, BudgetEngine
 from gateway.engines.validator import ValidationResult, ValidationVerdict
 from gateway.ledger.events import GatewayEvent
 from gateway.ledger.store import SqliteLedgerStore
-
 
 # ------------------------------------------------------------------ Tests
 
@@ -107,28 +105,28 @@ async def test_budget_record_waste(tmp_path):
         identity_key="team-a", provider="p", operation="o", outcome=CallOutcome.SUCCESS, cost_usd=1.0
     )
     res1 = CallResult(event=event1, response=httpx.Response(200), exception=None)
-    val1 = ValidationResult(ValidationVerdict.VALID, 0.0, tuple(), False, False, True, CallOutcome.SUCCESS, tuple())
+    val1 = ValidationResult(ValidationVerdict.VALID, 0.0, (), False, False, True, CallOutcome.SUCCESS, ())
     
     # Attempt 2: Billed and INVALID (Waste)
     event2 = GatewayEvent(
         identity_key="team-a", provider="p", operation="o", outcome=CallOutcome.SUCCESS, cost_usd=2.5
     )
     res2 = CallResult(event=event2, response=httpx.Response(200), exception=None)
-    val2 = ValidationResult(ValidationVerdict.INVALID, 1.0, tuple(), True, True, True, CallOutcome.SUSPECTED_SILENT_FAILURE, tuple())
+    val2 = ValidationResult(ValidationVerdict.INVALID, 1.0, (), True, True, True, CallOutcome.SUSPECTED_SILENT_FAILURE, ())
     
     # Attempt 3: Not Billed and INVALID (Not waste, cost_usd=None or was_billed=False)
     event3 = GatewayEvent(
         identity_key="team-a", provider="p", operation="o", outcome=CallOutcome.SUCCESS, cost_usd=0.0
     )
     res3 = CallResult(event=event3, response=httpx.Response(200), exception=None)
-    val3 = ValidationResult(ValidationVerdict.INVALID, 1.0, tuple(), True, True, False, CallOutcome.FAILURE, tuple())
+    val3 = ValidationResult(ValidationVerdict.INVALID, 1.0, (), True, True, False, CallOutcome.FAILURE, ())
     
     # Attempt 4: Billed and SUSPECT (Waste)
     event4 = GatewayEvent(
         identity_key="team-a", provider="p", operation="o", outcome=CallOutcome.SUCCESS, cost_usd=3.1
     )
     res4 = CallResult(event=event4, response=httpx.Response(200), exception=None)
-    val4 = ValidationResult(ValidationVerdict.SUSPECT, 0.8, tuple(), True, False, True, CallOutcome.SUCCESS, tuple())
+    val4 = ValidationResult(ValidationVerdict.SUSPECT, 0.8, (), True, False, True, CallOutcome.SUCCESS, ())
     
     class FakeTarget:
         adapter = None

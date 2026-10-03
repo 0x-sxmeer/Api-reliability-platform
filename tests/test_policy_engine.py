@@ -5,15 +5,15 @@ from __future__ import annotations
 
 import pytest
 
-from gateway.core.adapter import AdapterRequest
 from gateway.core.types import CallOutcome, ErrorCategory
-from gateway.ledger.store import SqliteLedgerStore
 from gateway.engines.policy import (
-    PolicyEngine,
-    PolicyConfig,
     OperationPolicy,
+    PolicyConfig,
+    PolicyEngine,
     PolicyVerdict,
 )
+from gateway.ledger.store import SqliteLedgerStore
+
 
 @pytest.mark.asyncio
 async def test_policy_engine_default_deny(tmp_path):

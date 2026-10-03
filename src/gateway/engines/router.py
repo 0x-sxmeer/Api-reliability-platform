@@ -11,15 +11,14 @@ from datetime import UTC, datetime
 
 from gateway.core.adapter import AdapterRequest, ProviderAdapter
 from gateway.core.executor import CallExecutor, CallResult
+from gateway.engines.budget import BudgetEngine
+from gateway.engines.policy import PolicyEngine, PolicyVerdict
 from gateway.engines.quota import QuotaAssessment, QuotaEngine, Verdict
 from gateway.engines.validator import (
     ResponseValidator,
     ValidationResult,
     ValidationVerdict,
 )
-from gateway.engines.budget import BudgetEngine
-from gateway.engines.policy import PolicyEngine, PolicyVerdict
-from gateway.engines.quota import Verdict as QuotaVerdict
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +109,7 @@ class RoutingEngine:
             if not allowed_targets:
                 # Return an immediate blocked outcome for AuthZ failures
                 logger.warning("AuthZ Denied for %s: %s", identity_key, auth_denial_reason)
-                return RoutingOutcome(None, tuple(), False, None)
+                return RoutingOutcome(None, (), False, None)
                 
             active_targets = allowed_targets
 
@@ -118,9 +117,9 @@ class RoutingEngine:
         if self._budget and active_targets:
             identity_key = active_targets[0].executor.identity_key
             budget_assessment = await self._budget.assess(identity_key)
-            if budget_assessment.verdict.value == "blocked":
+            if budget_assessment.verdict is Verdict.BLOCKED:
                 # Return an immediate blocked outcome
-                return RoutingOutcome(None, tuple(), False, None)
+                return RoutingOutcome(None, (), False, None)
 
         attempts: list[AttemptRecord] = []
         total_attempts = 0
@@ -217,13 +216,9 @@ class RoutingEngine:
             else:
                 target_idx += 1
 
-        # We exited the loop. Determine what to return.
-        if not fallback_result and attempts:
-            # If all attempts were quota BLOCKED, fallback_result is None.
-            pass
-
-        if fallback_result and fallback_validation:
-            succeeded = fallback_result.succeeded and fallback_validation.verdict == ValidationVerdict.VALID
+        # We exited the loop. `succeeded` was set True only on a VALID
+        # response inside the loop; otherwise it stays False (including
+        # when every attempt was quota-blocked and fallback_result is None).
 
         outcome = RoutingOutcome(
             final_result=fallback_result,

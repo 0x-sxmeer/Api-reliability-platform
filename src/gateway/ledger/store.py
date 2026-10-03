@@ -29,7 +29,7 @@ import json
 import re
 import sqlite3
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib import resources
 from pathlib import Path
 from uuid import UUID
@@ -244,7 +244,7 @@ class SqliteLedgerStore(LedgerStore):
                 if old_outcome not in (CallOutcome.PENDING.value, CallOutcome.SUSPECTED_SILENT_FAILURE.value):
                     raise ValueError(f"Event {event_id} has outcome {old_outcome} which cannot be reconciled.")
                     
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 conn.execute(
                     """
                     UPDATE events 
@@ -407,9 +407,11 @@ class SqliteLedgerStore(LedgerStore):
             cost_usd=row["cost_usd"],
             raw_provider_metadata=json.loads(row["raw_provider_metadata"]),
             quota_bucket=row["quota_bucket"],
-            reconciled_at=datetime.fromisoformat(row["reconciled_at"]) if row.keys() and "reconciled_at" in row.keys() and row["reconciled_at"] else None,
-            reconciled_reason=row["reconciled_reason"] if row.keys() and "reconciled_reason" in row.keys() else None,
-            original_outcome=CallOutcome(row["original_outcome"]) if row.keys() and "original_outcome" in row.keys() and row["original_outcome"] else None,
+            # NOTE: sqlite3.Row does NOT support .get(); use index access plus
+            # truthiness checks. Do not "modernize" these to row.get(...).
+            reconciled_at=datetime.fromisoformat(row["reconciled_at"]) if row["reconciled_at"] else None,
+            reconciled_reason=row["reconciled_reason"],
+            original_outcome=CallOutcome(row["original_outcome"]) if row["original_outcome"] else None,
         )
 
 
