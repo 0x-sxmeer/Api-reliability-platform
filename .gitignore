@@ -1,12 +1,10 @@
-# Python compiled files
+# Python bytecode caches
 __pycache__/
 *.pyc
 
-# Egg-info and build artifacts
-src/gateway.egg-info/
-*.egg-info/
-
-# Database files (runtime SQLite ledger is rebuilt from migrations)
+# Runtime SQLite artifact - schema lives in src/gateway/ledger/migrations.py,
+# so the DB file must never be committed (it churns on every test/sim run).
+gateway.db
 *.db
 
 # Test / lint caches
