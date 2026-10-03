@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from gateway.adapters.anthropic import AnthropicAdapter
 from gateway.adapters.openai import OpenAIAdapter
 from gateway.adapters.rest import GenericRestAdapter
-from gateway.core.adapter import AdapterRequest
+from gateway.core.adapter import AdapterRequest, ProviderAdapter
 from gateway.core.executor import CallExecutor
 from gateway.core.types import CallOutcome
 from gateway.engines.auth import AuthLifecycleManager
@@ -24,7 +24,7 @@ from gateway.engines.policy import OperationPolicy, PolicyConfig, PolicyEngine
 from gateway.engines.quota import QuotaEngine
 from gateway.engines.reconcile import ReconciliationEngine
 from gateway.engines.router import RoutingConfig, RoutingEngine, RoutingTarget
-from gateway.engines.validator import ResponseValidator
+from gateway.engines.validator import ResponseValidator, ValidationVerdict
 from gateway.ledger.store import SqliteLedgerStore
 
 logger = logging.getLogger(__name__)
@@ -33,23 +33,41 @@ logger = logging.getLogger(__name__)
 app_state = {}
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+def _build_wiring(db_path: str) -> dict:
+    """Construct every engine/adapter for one gateway instance.
+
+    Kept separate from the lifespan context manager so tests (and any
+    future multi-tenant factory) can build an isolated wiring graph
+    without touching global app_state or starting background tasks.
+    """
     # Initialize Ledger
-    db_path = os.getenv("GATEWAY_DB_PATH", "gateway.db")
     ledger = SqliteLedgerStore(db_path)
-    
+
+    # Dev Mode awareness: when no real credentials are configured, tell the
+    # operator (loudly, once) that outbound HTTP is being faked at the
+    # transport layer. Engines above it run 100% for real.
+    from gateway.devmode import describe as _describe_mode, dev_mode_enabled
+
+    if dev_mode_enabled():
+        logger.warning("GATEWAY STARTING IN %s", _describe_mode())
+
     # Initialize Engines
     quota_engine = QuotaEngine(ledger=ledger)
     validator = ResponseValidator()
     budget_engine = BudgetEngine(ledger=ledger)
+    # Demo/dev policy: allow chat-style operations across all registered
+    # providers. Production deployments should replace this with a real
+    # least-privilege policy file; default_deny stays True so anything
+    # not explicitly allowed is still blocked.
     policy_config = PolicyConfig(
         policies={
-            "default": [OperationPolicy(allowed_providers="*", allowed_operations=["chat.completions.create", "chat"])]
+            "default": [OperationPolicy(allowed_providers="*", allowed_operations=[
+                "chat.completions.create", "chat", "messages.create", "generate_content",
+            ])]
         }
     )
     policy_engine = PolicyEngine(ledger=ledger, config=policy_config)
-    
+
     # Initialize Router
     router = RoutingEngine(
         quota_engine=quota_engine,
@@ -58,7 +76,7 @@ async def lifespan(app: FastAPI):
         policy_engine=policy_engine,
         config=RoutingConfig(max_total_attempts=5)
     )
-    
+
     # Provider credentials come from the environment at deploy time.
     # Default to "mock" so local dev / test boots never crash; production
     # deployments must set OPENAI_API_KEY / ANTHROPIC_API_KEY (and any
@@ -67,35 +85,33 @@ async def lifespan(app: FastAPI):
     openai_api_key = os.getenv("OPENAI_API_KEY", "mock")
     anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "mock")
 
-    openai_adapter = OpenAIAdapter(api_key=openai_api_key)
-    quota_engine.register(openai_adapter)
-    openai_target = RoutingTarget(
-        adapter=openai_adapter,
-        executor=CallExecutor(adapter=openai_adapter, ledger=ledger, identity_key="default")
-    )
-    anthropic_adapter = AnthropicAdapter(api_key=anthropic_api_key)
-    quota_engine.register(anthropic_adapter)
-    anthropic_target = RoutingTarget(
-        adapter=anthropic_adapter,
-        executor=CallExecutor(adapter=anthropic_adapter, ledger=ledger, identity_key="default")
-    )
-    rest_adapter = GenericRestAdapter()
-    quota_engine.register(rest_adapter)
-    rest_target = RoutingTarget(
-        adapter=rest_adapter,
-        executor=CallExecutor(adapter=rest_adapter, ledger=ledger, identity_key="default")
-    )
-    router.register(openai_target)
-    router.register(anthropic_target)
-    router.register(rest_target)
+    # Routing order = failover preference: OpenAI first, then Anthropic,
+    # then the generic REST adapter as the terminal fallback target.
+    adapters: list[ProviderAdapter] = [
+        OpenAIAdapter(api_key=openai_api_key),
+        AnthropicAdapter(api_key=anthropic_api_key),
+        GenericRestAdapter(),
+    ]
+    for adapter in adapters:
+        quota_engine.register(adapter)  # register with quota BEFORE routing targets
+        router.register(RoutingTarget(
+            adapter=adapter,
+            executor=CallExecutor(adapter=adapter, ledger=ledger, identity_key="default"),
+        ))
 
-    reconcile_engine = ReconciliationEngine(ledger=ledger)
-    auth_manager = AuthLifecycleManager()
+    return {
+        "router": router,
+        "reconcile": ReconciliationEngine(ledger=ledger),
+        "auth": AuthLifecycleManager(),
+        "ledger": ledger,
+    }
 
-    app_state["router"] = router
-    app_state["reconcile"] = reconcile_engine
-    app_state["auth"] = auth_manager
-    app_state["ledger"] = ledger
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db_path = os.getenv("GATEWAY_DB_PATH", "gateway.db")
+    app_state.update(_build_wiring(db_path))
+    reconcile_engine = app_state["reconcile"]
 
     # Background worker for stuck pending events
     async def poll_pending_events():
@@ -136,6 +152,7 @@ app = FastAPI(title="API Reliability Platform", lifespan=lifespan)
 
 
 class ProxyRequest(BaseModel):
+    provider: str | None = None
     operation: str
     payload: dict
     extra: dict | None = None
@@ -145,6 +162,11 @@ class ProxyRequest(BaseModel):
 async def proxy(request: ProxyRequest):
     """
     Primary ingress endpoint for the Gateway Edge.
+
+    When `provider` is given, the request is dispatched to exactly that
+    adapter (no cross-provider failover — the caller chose their vendor).
+    When omitted, the full routing engine chain (policy → budget → quota
+    → retry/failover across all registered targets) applies.
     """
     router: RoutingEngine = app_state["router"]
 
@@ -153,6 +175,32 @@ async def proxy(request: ProxyRequest):
         payload=request.payload,
         extra=request.extra,
     )
+
+    if request.provider:
+        target = next(
+            (t for t in router.targets if t.adapter.provider_name == request.provider), None
+        )
+        if target is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Unknown provider '{request.provider}'. Registered: "
+                       f"{[t.adapter.provider_name for t in router.targets]}",
+            )
+        result = await target.executor.execute(adapter_req)
+        validation = router.validator.validate(result)
+        if result.succeeded and validation.verdict != ValidationVerdict.INVALID:
+            response = result.response
+            return {
+                "status": "success",
+                "provider": result.event.provider,
+                "response": response.json() if response is not None else None,
+                "warnings": [asdict(f) for f in validation.findings],
+            }
+        raise HTTPException(
+            status_code=502,
+            detail=f"Call to {request.provider} failed: "
+                   f"{result.classified_error.category.value if result.classified_error else 'validation rejected'}",
+        )
 
     outcome = await router.route(adapter_req)
 

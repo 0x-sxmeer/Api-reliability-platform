@@ -284,5 +284,19 @@ class GenericRestAdapter(ProviderAdapter):
 
         if self._client is not None:
             return await self._client.request(method, url, **kwargs)
+        from gateway.devmode import dev_mode_enabled
+
+        if dev_mode_enabled():
+            # Dev Mode: fake transport so demos need no real REST endpoints.
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(30.0), transport=_fake_transport()
+            ) as client:
+                return await client.request(method, url, **kwargs)
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
             return await client.request(method, url, **kwargs)
+
+
+def _fake_transport():
+    from gateway.devmode import FakeAPIResponses
+
+    return FakeAPIResponses()
