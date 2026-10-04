@@ -227,7 +227,10 @@ async def proxy(request: ProxyRequest):
         if assessment is not None and assessment.verdict is not PolicyVerdict.ALLOWED:
             raise HTTPException(status_code=502, detail=f"Policy denial: {assessment.reason}")
 
-        result = await target.executor.execute(adapter_req)
+        # Canonical dispatch: feeds rate-limit/error observations back into
+        # the SAME QuotaEngine the routing chain uses, so pinned traffic is
+        # never invisible to quota tracking or the dashboard.
+        result = await target.execute_observed(adapter_req, app_state.get("quota"))
         validation = router.validator.validate(result)
         if result.succeeded and validation.verdict != ValidationVerdict.INVALID:
             response = result.response

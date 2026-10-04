@@ -30,6 +30,27 @@ class RoutingTarget:
     adapter: ProviderAdapter
     executor: CallExecutor
 
+    async def execute_observed(
+        self, request: AdapterRequest, quota: QuotaEngine | None = None
+    ) -> CallResult:
+        """Execute exactly one attempt and feed the result back to the quota
+        engine (if provided).
+
+        This is the SINGLE canonical way any dispatch path should call an
+        executor. The routing chain uses it; pinned/manual dispatch must use
+        it too — otherwise header observations never reach QuotaEngine and
+        dashboards/quota decisions go blind for that traffic.
+        """
+        result = await self.executor.execute(request)
+        if quota is not None:
+            quota.observe(
+                self.adapter,
+                request,
+                snapshot=result.rate_limit,
+                error=result.classified_error,
+            )
+        return result
+
 
 @dataclass(frozen=True)
 class RoutingConfig:

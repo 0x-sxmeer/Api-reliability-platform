@@ -201,30 +201,38 @@ def add_dashboard_routes(app: FastAPI) -> None:
                 s["spend_usd"] = round(s["spend_usd"] + ev.cost_usd, 6)
 
         providers = []
+        seen: set[str] = set()
         for target in router.targets:
             name = target.adapter.provider_name
             st = stats.get(name, {})
+            seen.add(name)
             providers.append(
                 {
                     "provider": name,
                     "limiting_unit": target.adapter.get_limiting_unit().value,
                     "declares_quota_windows": len(target.adapter.quota_windows()) > 0,
                     "in_failover_chain": True,
-                    
-                        "calls": st.get("calls", 0),
-                        "successes": st.get("successes", 0),
-                        "failures": st.get("failures", 0),
-                        "spend_usd": st.get("spend_usd", 0.0)
-                    ,
+                    "calls": st.get("calls", 0),
+                    "successes": st.get("successes", 0),
+                    "failures": st.get("failures", 0),
+                    "spend_usd": st.get("spend_usd", 0.0),
                 }
             )
         # Providers seen in the ledger but not (currently) routed to — e.g.
-        # historical data after an adapter was removed. Show them honestly.
+        # historical data after an adapter was removed. Show them honestly
+        # so spend never silently disappears from the dashboard.
         for name, st in stats.items():
-            if name not in {p["provider"] for p in providers}:
+            if name not in seen:
                 providers.append({"provider": name, "in_failover_chain": False, **st})
 
-        return {"providers": providers, "quota_snapshot": quota.snapshot()}
+        quota_snapshot = quota.snapshot()
+        return {
+            "providers": providers,
+            "quota_snapshot": quota_snapshot,
+            # Honest empty-state: snapshot only contains buckets that have
+            # actually been observed by a dispatched call.
+            "note": None if quota_snapshot else "No quota observations yet — they appear after the first proxied call.",
+        }
 
     @app.get("/v1/dashboard/quota")
     async def dashboard_quota() -> dict[str, Any]:
@@ -390,17 +398,17 @@ function rows(tbl,cols,data){const t=$(tbl);
   data.map(d=>"<tr>"+d.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");}
 async function refresh(){
   try{
-    const [ov,st,pv,bg,rec,ev]=await Promise.all([
+    const [ov,st,pv,bg,rec,ev,sp]=await Promise.all([
       j("/v1/dashboard/overview"),j("/v1/dashboard/status"),
       j("/v1/dashboard/providers"),j("/v1/dashboard/budget"),
-      j("/v1/dashboard/reconciliation"),j("/v1/dashboard/events?limit=25")]);
+      j("/v1/dashboard/reconciliation"),j("/v1/dashboard/events?limit=25"),
+      j("/v1/dashboard/spend")]);
     $("stamp").textContent=new Date().toLocaleTimeString();
     const mp=$("mode-pill");mp.textContent=st.mode;
     mp.className="pill "+(st.dev_mode?"dev":"live");
     $("targets-pill").textContent="targets: "+st.targets.join(" → ");
     $("worker-pill").textContent="reconciler: "+(st.background_worker_alive?"running":"stopped");
     $("worker-pill").className="pill "+(st.background_worker_alive?"live":"dev");
-    rows("kpis".length? "kpis":"" ,[],[]); // placeholder guard (grid uses divs)
     $("kpis").innerHTML=[
       ["Calls (24h)",ov.total_calls,null],
       ["Success rate",pct(ov.success_rate),ov.success_rate>0.95?"ok":ov.success_rate>0.8?"warn":"bad"],
@@ -410,20 +418,34 @@ async function refresh(){
       ["Latency p95",(ov.latency_p95_ms?Math.round(ov.latency_p95_ms)+"ms":"—"),null],
       ["Pending settle",rec.pending_count,rec.pending_count?"warn":"ok"],
     ].map(k=>'<div class="card kpi"><div class="n '+k[2]+'">'+k[1]+'</div><div class="l">'+k[0]+'</div></div>').join("");
-    rows("providers",["Provider","Calls","OK","Fail","Spend","Limiting unit","Ledger-derived windows"],
-      pv.providers.map(p=>[p.provider,p.calls,
-        '<span class="ok">'+p.successes+'</span>','<span class="'+(p.failures?"bad":"mut")+'">'+(p.failures??0)+'</span>',
-        fmt$(p.spend_usd||0),p.limiting_unit||"—",p.declares_quota_windows?"yes":"headers"]));
+    rows("providers",["Provider","Calls","OK","Fail","Spend","Limiting unit","Quota windows"],
+      pv.providers.map(p=>[p.provider,p.calls??0,
+        '<span class="ok">'+(p.successes??0)+'</span>','<span class="'+(p.failures?"bad":"mut")+'">'+(p.failures??0)+'</span>',
+        fmt$(p.spend_usd||0),p.limiting_unit||"—",
+        p.declares_quota_windows===undefined?"—":(p.declares_quota_windows?"ledger windows":"header-based")]));
     const vb={open:"ok",low:"warn",probe:"warn",blocked:"bad",unknown:"mut"};
-    rows("quota",["Provider","Bucket","Verdict","Confidence","Binding constraint","Headroom","Retry at"],
+    function bindingCell(q){
+      if(!q.binding)return "—";
+      const b=q.binding;
+      let frac=null,label="requests";
+      if(b.requests_limit!=null&&b.requests_remaining!=null){frac=Math.max(0,b.requests_remaining/b.requests_limit);label="req "+b.requests_remaining+"/"+b.requests_limit;}
+      else if(b.tokens_limit!=null&&b.tokens_remaining!=null){frac=Math.max(0,b.tokens_remaining/b.tokens_limit);label="tok "+b.tokens_remaining+"/"+b.tokens_limit;}
+      if(frac===null)return "—";
+      return '<div style="display:flex;align-items:center;gap:8px"><div class="bar"><i style="width:'+Math.round(frac*100)+'%"></i></div><span class="mut" style="font-size:12px">'+label+'</span></div>';
+    }
+    rows("quota",["Provider","Bucket","Verdict","Confidence","Headroom","Retry at"],
       (pv.quota_snapshot||[]).map(q=>[q.provider,q.bucket,'<span class="'+vb[q.verdict]+'">'+q.verdict.toUpperCase()+'</span>',
-        q.confidence,(q.binding?q.binding.unit+" "+q.binding.label+" ("+q.binding.source+")":"—"),
-        q.binding&&q.binding.fraction_remaining!=null?'<div class="bar"><i style="width:'+Math.round(q.binding.fraction_remaining*100)+'%"></i></div>':"—",
+        q.confidence,bindingCell(q),
         q.retry_at?new Date(q.retry_at).toLocaleTimeString():"—"]));
     $("budget").innerHTML='<div class="card kpi"><div class="n '+(bg.verdict==="open"?"ok":"bad")+'">'+
       bg.verdict.toUpperCase()+'</div><div class="l">Budget verdict (identity=default)</div></div>'+
       '<div class="card kpi"><div class="n">'+(bg.cost_headroom_usd==null?"∞":fmt$(bg.cost_headroom_usd))+
-      '</div><div class="l">Headroom remaining</div></div>';
+      '</div><div class="l">Headroom remaining</div></div>'+
+      '<div class="card kpi"><div class="n">'+fmt$(sp.month_to_date_usd)+
+      '</div><div class="l">MTD spend (all identities)</div></div>'+
+      '<div class="card kpi"><div class="n">'+Object.keys(sp.spend_by_provider_usd||{}).length+
+      '</div><div class="l">Providers billing (24h): '+
+      Object.entries(sp.spend_by_provider_usd||{}).map(e=>e[0]+" "+fmt$(e[1])).join(" · ")+'</div></div>';
     if(rec.pending.length){rows("recon",["Event","Provider","Operation","Since","Reason"],
       rec.pending.map(e=>[e.event_id.slice(0,8),e.provider,e.operation,new Date(e.timestamp).toLocaleTimeString(),e.reconciled_reason||"awaiting webhook"]));}
     else{$("recon").innerHTML="<tr><td class='ok'>No unresolved events — ledger fully settled ✓</td></tr>";}

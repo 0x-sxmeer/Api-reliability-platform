@@ -1,6 +1,7 @@
 README.md
 pyproject.toml
 src/gateway/__init__.py
+src/gateway/dashboard.py
 src/gateway/devmode.py
 src/gateway/server.py
 src/gateway.egg-info/PKG-INFO
@@ -38,6 +39,7 @@ src/gateway/ledger/migrations/__init__.py
 tests/test_anthropic_adapter.py
 tests/test_auth_lifecycle.py
 tests/test_budget_engine.py
+tests/test_dashboard.py
 tests/test_executor.py
 tests/test_gemini_adapter.py
 tests/test_ledger_migrations.py
