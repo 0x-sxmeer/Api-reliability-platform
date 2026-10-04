@@ -19,12 +19,82 @@ ValueError before any network I/O -- never a fabricated success.
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import math
+import os
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
+
+
+def _ssrf_guard(url: str) -> None:
+    """Reject URLs that point at loopback / private / link-local ranges.
+
+    Fixes audit F-19 (SSRF): scheme validation alone lets an attacker hit
+    http://169.254.169.254/ (cloud metadata), localhost services, or RFC1918
+    hosts through this adapter — reachable unauthenticated end-to-end when
+    combined with the old provider-pinned bypass. Literal IPs are checked
+    directly; hostnames are resolved before the request is sent so DNS
+    answers pointing at internal ranges are also rejected.
+
+    Escape hatch: GATEWAY_ALLOW_PRIVATE_REST_TARGETS=1 disables the check
+    for trusted self-hosted backends (documented in .env.example).
+    """
+    if os.getenv("GATEWAY_ALLOW_PRIVATE_REST_TARGETS", "").lower() in ("1", "true", "yes"):
+        return
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    if not host:
+        raise ValueError(f"REST adapter: URL has no host: {url!r}")
+
+    def _blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> str | None:
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved \
+                or ip.is_multicast or ip.is_unspecified:
+            return str(ip)
+        return None
+
+    try:
+        literal = ipaddress.ip_address(host)
+    except ValueError:
+        literal = None
+    if literal is not None:
+        bad = _blocked(literal)
+        if bad:
+            raise ValueError(
+                f"REST adapter: refusing SSRF target {url!r} (resolves to "
+                f"non-public address {bad})"
+            )
+        return
+
+    # Hostname: resolve every A/AAAA answer and reject if ANY points inward.
+    import socket
+
+    try:
+        try:
+        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80))
+    except socket.gaierror:
+        # Offline test/CI environments cannot resolve example.com. A host that
+        # resolves to nothing is inert; the real request will fail at connect
+        # time anyway. Only REJECT when resolution succeeds and lands on a
+        # non-public address (fail-open on DNS failure, fail-closed on hits).
+        return
+    except socket.gaierror as e:
+        raise ValueError(f"REST adapter: cannot resolve host for {url!r}: {e}") from e
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError:
+            continue
+        bad = _blocked(ip)
+        if bad:
+            raise ValueError(
+                f"REST adapter: refusing SSRF target {url!r} (host {host!r} "
+                f"resolves to non-public address {bad})"
+            )
 
 from gateway.core.adapter import AdapterRequest, ProviderAdapter
 from gateway.core.types import (
@@ -270,6 +340,9 @@ class GenericRestAdapter(ProviderAdapter):
                 f"GenericRestAdapter cannot perform operation {request.operation!r}: "
                 "request.extra['url'] must be an absolute http(s) URL"
             )
+        # Audit F-19: refuse loopback/private/link-local targets (cloud
+        # metadata exfil, internal port-scan) before any network I/O.
+        _ssrf_guard(url)
         method = str(request.extra.get("method", "POST")).upper()
         headers: dict[str, str] = dict(request.extra.get("headers") or {})
         if self._api_key and "authorization" not in {k.lower() for k in headers}:

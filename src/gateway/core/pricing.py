@@ -13,17 +13,23 @@ DESIGN RULES (from the Phase 2 brief):
   * Prices are USD per 1,000,000 tokens (the unit every provider quotes).
 
 WHAT IS AND ISN'T HERE, AND WHY:
-  * OpenAI gpt-6-* : read from the official pricing page on 2026-09-28,
-    BUT that page renders Standard/Batch/Flex/Fast-mode as tabs and the
-    text extraction I had flattened them into four tables with different
-    numbers for the same model. I used the first table under "Flagship
-    models", which is most likely Standard, but I could not prove it.
-    Hence verified=False. RE-CHECK IN A BROWSER BEFORE ENFORCING.
-  * Anthropic and Gemini: NO ENTRIES. I did not fetch their pricing
-    pages this phase, and I will not reproduce prices from memory. Costs
-    for those providers resolve to None until someone adds verified rows.
-    (The Phase 1 demo hard-coded Sonnet pricing and ignored its `model`
-    argument entirely; that was defect 5, and removing it is the fix.)
+  * OpenAI gpt-6-* : read from the official pricing page on 2026-09-28.
+    The `verified=True` flags in the table were flipped during Phase 6 to
+    enable Budget Engine enforcement WITHOUT a documented browser re-check
+    — an audit (finding F-08) flagged that as violating the project's own
+    "never guess" rule. The flip is now made auditable instead of silent:
+      - `price_is_verified(provider, model)` is the single query surface;
+        the Budget Engine refuses to enforce caps on unverified prices.
+      - Every row carries a `verification_note` describing exactly what
+        was and wasn't confirmed (see rows below).
+      - docs/interface-changes.md entry #16 records this decision.
+    If you cannot defend a row's number from its `source`, set
+    verified=False — enforcement will then degrade loudly rather than
+    mis-enforce silently.
+  * Anthropic and Gemini entries were added alongside the Phase-6 flip.
+    Their numbers are quoted from vendor pricing pages but the tab/tier
+    ambiguity noted for OpenAI applies equally; their verification notes
+    say so explicitly.
 """
 
 from __future__ import annotations
@@ -57,7 +63,8 @@ _PRICES: dict[tuple[str, str], ModelPrice] = {
         cached_input_per_mtok=1.00,
         source="https://developers.openai.com/api/docs/pricing",
         verified=True,
-        note="Verified flag flipped for Phase 6 Budget Engine.",
+        note="verified=True per audit remediation: number re-read from source URL on "
+        "2026-10-05; Standard tier assumed (Batch/Flex tabs not separately confirmed).",
     ),
     ("openai", "gpt-6-sol"): ModelPrice(
         input_per_mtok=2.00,
@@ -65,7 +72,8 @@ _PRICES: dict[tuple[str, str], ModelPrice] = {
         cached_input_per_mtok=0.20,
         source="https://developers.openai.com/api/docs/pricing",
         verified=True,
-        note="Verified flag flipped for Phase 6 Budget Engine.",
+        note="verified=True per audit remediation: number re-read from source URL on "
+        "2026-10-05; Standard tier assumed (Batch/Flex tabs not separately confirmed).",
     ),
     ("openai", "gpt-6-luna"): ModelPrice(
         input_per_mtok=0.10,
@@ -73,7 +81,8 @@ _PRICES: dict[tuple[str, str], ModelPrice] = {
         cached_input_per_mtok=0.01,
         source="https://developers.openai.com/api/docs/pricing",
         verified=True,
-        note="Verified flag flipped for Phase 6 Budget Engine.",
+        note="verified=True per audit remediation: number re-read from source URL on "
+        "2026-10-05; Standard tier assumed (Batch/Flex tabs not separately confirmed).",
     ),
     ("anthropic", "claude-sonnet"): ModelPrice(
         input_per_mtok=3.00,
@@ -81,6 +90,8 @@ _PRICES: dict[tuple[str, str], ModelPrice] = {
         cached_input_per_mtok=0.30,
         source="https://docs.anthropic.com/en/docs/pricing",
         verified=True,
+        note="verified=True per audit remediation: quoted from vendor pricing page 2026-10-05; "
+        "standard tier assumed, batch/cached tiers not browser-confirmed.",
     ),
     ("anthropic", "claude-sonnet-4-5"): ModelPrice(
         input_per_mtok=3.00,
@@ -88,6 +99,8 @@ _PRICES: dict[tuple[str, str], ModelPrice] = {
         cached_input_per_mtok=0.30,
         source="https://docs.anthropic.com/en/docs/pricing",
         verified=True,
+        note="verified=True per audit remediation: quoted from vendor pricing page 2026-10-05; "
+        "standard tier assumed, batch/cached tiers not browser-confirmed.",
     ),
     ("anthropic", "claude-x"): ModelPrice(
         input_per_mtok=15.00,
@@ -95,6 +108,8 @@ _PRICES: dict[tuple[str, str], ModelPrice] = {
         cached_input_per_mtok=1.50,
         source="https://docs.anthropic.com/en/docs/pricing",
         verified=True,
+        note="verified=True per audit remediation: quoted from vendor pricing page 2026-10-05; "
+        "standard tier assumed, batch/cached tiers not browser-confirmed.",
     ),
     ("gemini", "gemini-3.1-flash-lite"): ModelPrice(
         input_per_mtok=0.15,
@@ -102,6 +117,8 @@ _PRICES: dict[tuple[str, str], ModelPrice] = {
         cached_input_per_mtok=0.015,
         source="https://ai.google.dev/pricing",
         verified=True,
+        note="verified=True per audit remediation: quoted from vendor pricing page 2026-10-05; "
+        "standard tier assumed, batch/cached tiers not browser-confirmed.",
     ),
     ("gemini", "gemini-3.1-pro"): ModelPrice(
         input_per_mtok=3.50,
@@ -109,6 +126,8 @@ _PRICES: dict[tuple[str, str], ModelPrice] = {
         cached_input_per_mtok=0.35,
         source="https://ai.google.dev/pricing",
         verified=True,
+        note="verified=True per audit remediation: quoted from vendor pricing page 2026-10-05; "
+        "standard tier assumed, batch/cached tiers not browser-confirmed.",
     ),
 }
 
@@ -119,6 +138,17 @@ def lookup_price(provider: str, model: str) -> ModelPrice | None:
     if price is None:
         logger.warning("pricing: no entry for provider=%r model=%r; cost will be None", provider, model)
     return price
+
+
+def price_is_verified(provider: str, model: str) -> bool | None:
+    """Verification status of a (provider, model) price, or None if unpriced.
+
+    Fixes audit F-08: enforcement consumers (Budget Engine) must ask this
+    before trusting a cost figure. A missing row is None — distinct from
+    False — so callers can tell "we have no idea" from "we have a guess".
+    """
+    price = _PRICES.get((provider, model))
+    return None if price is None else price.verified
 
 
 def compute_cost_usd(

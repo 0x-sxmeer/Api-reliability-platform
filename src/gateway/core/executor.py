@@ -227,6 +227,11 @@ class CallExecutor:
             raw_provider_metadata={
                 "rate_limit_headers": snapshot.raw_headers,
                 "bad_pattern_names": [m.pattern_name for m in bad_patterns],
+                # Audit F-09 remediation: stamp the model so downstream
+                # consumers (Budget Engine's unverified-price guard) can
+                # attribute a cost_usd back to its pricing row. Without
+                # this, costs are un-auditable after the fact.
+                "model": usage.model if usage is not None else "",
             },
         )
         await self._ledger.append(event)

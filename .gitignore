@@ -1,10 +1,6 @@
-# Python compiled files
+# Python bytecode and cache
 __pycache__/
 *.pyc
 
-# Coverage and test artifacts
-.coverage
-.pytest_cache/
-
-# Database files
-*.db
+# Package distribution artifacts
+*.egg-info/

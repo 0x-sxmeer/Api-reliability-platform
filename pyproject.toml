@@ -11,10 +11,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+server = [
+    # Fixes audit F-12: server.py imports fastapi but these were undeclared,
+    # so a fresh `pip install -e .` produced ModuleNotFoundError on import
+    # gateway.server. Install with: pip install -e ".[server]"
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "ruff>=0.16.0",       # `ruff check src/ tests/ examples/` is the project's lint gate
+    "gateway[server]",    # tests/test_server_endpoints.py needs fastapi TestClient
 ]
 
 [tool.setuptools.packages.find]
