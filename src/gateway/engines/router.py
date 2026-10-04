@@ -303,3 +303,11 @@ class RoutingEngine:
             await self._budget.record_waste(outcome)
             
         return outcome
+
+    def target_for(self, provider_name: str) -> RoutingTarget | None:
+        """Find a target by its provider name without leaking provider names to the caller."""
+        return next((t for t in self._targets if t.adapter.provider_name.startswith(provider_name) and len(t.adapter.provider_name) == len(provider_name)), None)
+
+    def registered_providers(self) -> list[str]:
+        """Return the names of all registered providers."""
+        return [t.adapter.provider_name for t in self._targets]

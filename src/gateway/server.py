@@ -263,9 +263,7 @@ async def proxy(request: ProxyRequest, http_request: Request):
     )
 
     if request.provider:
-        target = next(
-            (t for t in router.targets if t.adapter.provider_name == request.provider), None
-        )
+        target = router.target_for(request.provider)
         if target is None:
             # Do not echo the full registered-provider list to unauthenticated
             # clients on an auth-enabled deployment? The list is non-secret

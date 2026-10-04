@@ -30,7 +30,7 @@ async def test_policy_engine_default_deny(tmp_path):
     rows = await ledger.query(identity_key="unknown-team")
     assert len(rows) == 1
     assert rows[0].outcome == CallOutcome.FAILURE
-    assert rows[0].error_category == ErrorCategory.REQUIRES_HUMAN_ACTION
+    assert rows[0].error_category == ErrorCategory.AUTHZ_DENIED
     assert rows[0].http_status == 403
 
 

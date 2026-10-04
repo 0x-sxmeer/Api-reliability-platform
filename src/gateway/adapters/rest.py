@@ -73,7 +73,6 @@ def _ssrf_guard(url: str) -> None:
     import socket
 
     try:
-        try:
         infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80))
     except socket.gaierror:
         # Offline test/CI environments cannot resolve example.com. A host that
@@ -81,8 +80,6 @@ def _ssrf_guard(url: str) -> None:
         # time anyway. Only REJECT when resolution succeeds and lands on a
         # non-public address (fail-open on DNS failure, fail-closed on hits).
         return
-    except socket.gaierror as e:
-        raise ValueError(f"REST adapter: cannot resolve host for {url!r}: {e}") from e
     for info in infos:
         addr = info[4][0]
         try:

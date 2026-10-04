@@ -12,6 +12,9 @@ Exercises the real ASGI app through httpx.ASGITransport with a temp DB:
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import uuid
 from collections.abc import AsyncIterator
 
@@ -95,12 +98,23 @@ async def _seed_pending(client, provider: str = "generic_rest") -> uuid.UUID:
     return event_id
 
 
-async def test_webhook_settles_pending_event(client):
-    event_id = await _seed_pending(client)
-    resp = await client.post(
-        f"/v1/webhooks/{'stripe'}",
-        json={"event_id": str(event_id), "status": "delivered", "reason": "receipt"},
+async def _post_webhook(client, provider: str, payload: dict):
+    raw_body = json.dumps(payload).encode("utf-8")
+    sig = "sha256=" + hmac.new(b"test_secret", raw_body, hashlib.sha256).hexdigest()
+    return await client.post(
+        f"/v1/webhooks/{provider}",
+        content=raw_body,
+        headers={
+            "Content-Type": "application/json",
+            "x-gateway-signature": sig,
+        },
     )
+
+async def test_webhook_settles_pending_event(client, monkeypatch):
+    monkeypatch.setenv("GATEWAY_WEBHOOK_SECRET", "test_secret")
+    event_id = await _seed_pending(client)
+    payload = {"event_id": str(event_id), "status": "delivered", "reason": "receipt"}
+    resp = await _post_webhook(client, "stripe", payload)
     assert resp.status_code == 200
     rows = await server_module.app_state["ledger"].query(provider="generic_rest")
     settled = next(r for r in rows if r.event_id == event_id)
@@ -109,11 +123,12 @@ async def test_webhook_settles_pending_event(client):
     assert settled.reconciled_at is not None
 
 
-async def test_webhook_double_settle_is_rejected_400(client):
+async def test_webhook_double_settle_is_rejected_400(client, monkeypatch):
+    monkeypatch.setenv("GATEWAY_WEBHOOK_SECRET", "test_secret")
     event_id = await _seed_pending(client)
-    ok = await client.post("/v1/webhooks/stripe", json={"event_id": str(event_id), "status": "delivered"})
+    ok = await _post_webhook(client, "stripe", {"event_id": str(event_id), "status": "delivered"})
     assert ok.status_code == 200
-    again = await client.post("/v1/webhooks/stripe", json={"event_id": str(event_id), "status": "failed"})
+    again = await _post_webhook(client, "stripe", {"event_id": str(event_id), "status": "failed"})
     assert again.status_code == 400
     # State machine held: still SUCCESS, not flipped to FAILURE.
     rows = await server_module.app_state["ledger"].query(provider="generic_rest")
@@ -121,15 +136,17 @@ async def test_webhook_double_settle_is_rejected_400(client):
     assert row.outcome is CallOutcome.SUCCESS
 
 
-async def test_webhook_unknown_status_is_422_never_guessed(client):
+async def test_webhook_unknown_status_is_422_never_guessed(client, monkeypatch):
+    monkeypatch.setenv("GATEWAY_WEBHOOK_SECRET", "test_secret")
     event_id = await _seed_pending(client)
-    resp = await client.post("/v1/webhooks/stripe", json={"event_id": str(event_id), "status": "maybe"})
+    resp = await _post_webhook(client, "stripe", {"event_id": str(event_id), "status": "maybe"})
     assert resp.status_code == 422
     rows = await server_module.app_state["ledger"].query(provider="generic_rest")
     row = next(r for r in rows if r.event_id == event_id)
     assert row.outcome is CallOutcome.PENDING  # untouched
 
 
-async def test_webhook_malformed_uuid_is_422(client):
-    resp = await client.post("/v1/webhooks/stripe", json={"event_id": "not-a-uuid", "status": "delivered"})
+async def test_webhook_malformed_uuid_is_422(client, monkeypatch):
+    monkeypatch.setenv("GATEWAY_WEBHOOK_SECRET", "test_secret")
+    resp = await _post_webhook(client, "stripe", {"event_id": "not-a-uuid", "status": "delivered"})
     assert resp.status_code == 422
