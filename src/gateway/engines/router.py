@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from gateway.core.adapter import AdapterRequest, ProviderAdapter
 from gateway.core.executor import CallExecutor, CallResult
 from gateway.engines.budget import BudgetEngine
-from gateway.engines.policy import PolicyEngine, PolicyVerdict
+from gateway.engines.policy import PolicyAssessment, PolicyEngine, PolicyVerdict
 from gateway.engines.quota import QuotaAssessment, QuotaEngine, Verdict
 from gateway.engines.validator import (
     ResponseValidator,
@@ -89,6 +89,33 @@ class RoutingEngine:
     @property
     def validator(self) -> ResponseValidator:
         return self._validator
+
+    def target_for(self, provider_name: str) -> RoutingTarget | None:
+        """Look up a registered target by the name its adapter publishes.
+
+        Generic registry lookup keyed on each adapter's own ``provider_name``
+        property (the same pattern as the quota engine's registry). This is
+        dispatch-by-registry, not vendor branching: no vendor-specific
+        knowledge or per-vendor behavior lives here — the caller passes an
+        opaque name and gets back whichever target published it.
+        """
+        return {t.adapter.provider_name: t for t in self._targets}.get(provider_name)
+
+    def registered_providers(self) -> list[str]:
+        """Provider names of all registered targets, in failover order."""
+        return [t.adapter.provider_name for t in self._targets]
+
+    async def policy_assess(
+        self, identity_key: str, provider_name: str, operation: str
+    ) -> PolicyAssessment | None:
+        """Run the policy gate for one (identity, provider, operation) triple.
+
+        Returns None when no PolicyEngine is configured (gate disabled).
+        Delegates to the engine so callers never touch provider internals.
+        """
+        if self._policy is None:
+            return None
+        return await self._policy.assess(identity_key, provider_name, operation)
 
     async def route(self, request: AdapterRequest) -> RoutingOutcome:
         """

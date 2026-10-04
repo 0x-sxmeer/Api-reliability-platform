@@ -1,14 +1,10 @@
-# Python bytecode and caches
+# Python compiled files
 __pycache__/
 *.pyc
 
-# Coverage reports
+# Testing artifacts
 .coverage
-htmlcov/
-coverage/
+.pytest_cache/
 
 # Database files
-*.db
-
-# Egg-info directories
-*.egg-info/
+gateway.db

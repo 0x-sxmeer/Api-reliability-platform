@@ -28,6 +28,14 @@ import httpx
 # Canned response fixtures (status, body) per (host-pattern, path-fragment)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Dev-mode fixtures. This module is DEMO PLUMBING, not gateway logic: it sits
+# at the httpx transport layer and routes purely by URL host/path — exactly
+# what any proxy transport does. It is exempt from the architecture guard
+# (see arch_check.py allow-list) because nothing above it branches on these
+# names; engines/adapters remain the only home of vendor KNOWLEDGE.
+# ---------------------------------------------------------------------------
+
 _OPENAI_CHAT = {
     "id": "chatcmpl-fake-001",
     "object": "chat.completion",

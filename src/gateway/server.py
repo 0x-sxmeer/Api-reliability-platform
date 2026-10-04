@@ -22,7 +22,12 @@ from gateway.core.types import CallOutcome
 from gateway.dashboard import add_dashboard_page, add_dashboard_routes
 from gateway.engines.auth import AuthLifecycleManager
 from gateway.engines.budget import BudgetEngine
-from gateway.engines.policy import OperationPolicy, PolicyConfig, PolicyEngine
+from gateway.engines.policy import (
+    OperationPolicy,
+    PolicyConfig,
+    PolicyEngine,
+    PolicyVerdict,
+)
 from gateway.engines.quota import QuotaEngine
 from gateway.engines.reconcile import ReconciliationEngine
 from gateway.engines.router import RoutingConfig, RoutingEngine, RoutingTarget
@@ -48,7 +53,8 @@ def _build_wiring(db_path: str) -> dict:
     # Dev Mode awareness: when no real credentials are configured, tell the
     # operator (loudly, once) that outbound HTTP is being faked at the
     # transport layer. Engines above it run 100% for real.
-    from gateway.devmode import describe as _describe_mode, dev_mode_enabled
+    from gateway.devmode import describe as _describe_mode
+    from gateway.devmode import dev_mode_enabled
 
     if dev_mode_enabled():
         logger.warning("GATEWAY STARTING IN %s", _describe_mode())
@@ -64,7 +70,7 @@ def _build_wiring(db_path: str) -> dict:
     policy_config = PolicyConfig(
         policies={
             "default": [OperationPolicy(allowed_providers="*", allowed_operations=[
-                "chat.completions.create", "chat", "messages.create", "generate_content",
+                "chat.completions.create", "chat", "messages.create", "generateContent",
             ])]
         }
     )
@@ -201,15 +207,26 @@ async def proxy(request: ProxyRequest):
     )
 
     if request.provider:
-        target = next(
-            (t for t in router.targets if t.adapter.provider_name == request.provider), None
-        )
+        # Pinned dispatch: the caller chose their vendor. Target lookup and
+        # policy enforcement are delegated to the RoutingEngine so that ALL
+        # routing/policy semantics live in one provider-agnostic engine and
+        # the server never compares provider names itself (The One Rule).
+        # The pinned path enforces the same Policy gate as the routing
+        # chain — pinning a vendor must never bypass AuthZ/BOLA. Budget and
+        # quota accounting still apply inside the executor/ledger.
+        target = router.target_for(request.provider)
         if target is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Unknown provider '{request.provider}'. Registered: "
-                       f"{[t.adapter.provider_name for t in router.targets]}",
+                       f"{router.registered_providers()}",
             )
+
+        identity_key = target.executor.identity_key
+        assessment = await router.policy_assess(identity_key, request.provider, request.operation)
+        if assessment is not None and assessment.verdict is not PolicyVerdict.ALLOWED:
+            raise HTTPException(status_code=502, detail=f"Policy denial: {assessment.reason}")
+
         result = await target.executor.execute(adapter_req)
         validation = router.validator.validate(result)
         if result.succeeded and validation.verdict != ValidationVerdict.INVALID:

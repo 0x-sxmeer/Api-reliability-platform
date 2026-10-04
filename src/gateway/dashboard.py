@@ -79,7 +79,7 @@ async def _recent_events(ledger: LedgerStore, limit: int) -> list[dict[str, Any]
     return [_event_json(e) for e in events]
 
 
-def _event_json(e: "GatewayEvent") -> dict[str, Any]:
+def _event_json(e: GatewayEvent) -> dict[str, Any]:
     return {
         "event_id": str(e.event_id),
         "timestamp": e.timestamp.isoformat(),
@@ -210,12 +210,12 @@ def add_dashboard_routes(app: FastAPI) -> None:
                     "limiting_unit": target.adapter.get_limiting_unit().value,
                     "declares_quota_windows": len(target.adapter.quota_windows()) > 0,
                     "in_failover_chain": True,
-                    **{
+                    
                         "calls": st.get("calls", 0),
                         "successes": st.get("successes", 0),
                         "failures": st.get("failures", 0),
-                        "spend_usd": st.get("spend_usd", 0.0),
-                    },
+                        "spend_usd": st.get("spend_usd", 0.0)
+                    ,
                 }
             )
         # Providers seen in the ledger but not (currently) routed to — e.g.
@@ -297,7 +297,8 @@ def add_dashboard_routes(app: FastAPI) -> None:
 
     @app.get("/v1/dashboard/status")
     async def dashboard_status() -> dict[str, Any]:
-        from gateway.devmode import describe as describe_mode, dev_mode_enabled
+        from gateway.devmode import describe as describe_mode
+        from gateway.devmode import dev_mode_enabled
 
         state = _state(app)
         router: RoutingEngine = state["router"]
