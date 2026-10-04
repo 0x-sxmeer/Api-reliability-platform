@@ -1,10 +1,12 @@
-# Python compiled files
+# Compiled and build artifacts
 __pycache__/
 *.pyc
 
-# Coverage and test artifacts
+# Coverage reports
 .coverage
-.pytest_cache/
 
 # Database files
 *.db
+
+# Egg-info directories (build metadata)
+*.egg-info/

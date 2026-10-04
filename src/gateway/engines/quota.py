@@ -515,6 +515,84 @@ class QuotaEngine:
         ex.next_probe_at = now + self._probe_delay(ex.count + 1, ex.provisional)
         return True
 
+    # ------------------------------------------------------------- snapshot
+
+    def snapshot(self) -> list[dict]:
+        """Read-only view of live quota state, for observability (Phase 9).
+
+        Returns one dict per (provider, bucket) that has ever been observed,
+        with the CURRENT verdict/confidence and the tightest known constraint.
+        Pure data: no provider names or units are interpreted here — values
+        come from each adapter's own observations. JSON-safe (datetimes as
+        ISO strings) so the dashboard can render it without a second model.
+        """
+        now = _utc(self._clock(), "clock()")
+        out: list[dict] = []
+        for key, state in sorted(self._states.items(), key=lambda kv: (kv[0].provider, kv[0].bucket)):
+            exhaustion = state.exhaustion
+            cooldown_active = state.cooldown_until is not None and now < state.cooldown_until
+            if exhaustion is not None and now < exhaustion.blocked_until:
+                verdict = "blocked"
+                reason = "quota_exhausted"
+                retry_at = exhaustion.next_probe_at
+            elif cooldown_active:
+                verdict = "blocked"
+                reason = "cooldown"
+                retry_at = state.cooldown_until
+            else:
+                reason = None
+                retry_at = None
+                # Best-effort verdict from freshest header observations only;
+                # full assessment (incl. ledger counting) needs a request,
+                # which this read-only view deliberately does not fabricate.
+                fresh = [
+                    o for o in state.observations.values() if now - o.at <= self._config.fresh_for
+                ]
+                if not fresh:
+                    verdict = "unknown"
+                else:
+                    fracs = []
+                    for o in fresh:
+                        s = o.snapshot
+                        for rem, lim in (
+                            (s.requests_remaining, s.requests_limit),
+                            (s.tokens_remaining, s.tokens_limit),
+                        ):
+                            if rem is not None and lim:
+                                fracs.append(max(0.0, rem / lim))
+                    if not fracs:
+                        verdict = "unknown"
+                    elif min(fracs) < self._config.low_headroom_fraction:
+                        verdict = "low"
+                    else:
+                        verdict = "open"
+            binding = None
+            obs_units = sorted(state.observations, key=lambda u: u.value)
+            if obs_units:
+                latest = max((state.observations[u] for u in obs_units), key=lambda o: o.at)
+                s = latest.snapshot
+                binding = {
+                    "unit": s.limiting_unit.value,
+                    "requests_remaining": s.requests_remaining,
+                    "requests_limit": s.requests_limit,
+                    "tokens_remaining": s.tokens_remaining,
+                    "tokens_limit": s.tokens_limit,
+                    "reset_at": s.reset_at.isoformat() if s.reset_at else None,
+                    "observed_at": latest.at.isoformat(),
+                }
+            out.append(
+                {
+                    "provider": key.provider,
+                    "bucket": key.bucket,
+                    "verdict": verdict,
+                    "block_reason": reason,
+                    "retry_at": retry_at.isoformat() if retry_at else None,
+                    "binding": binding,
+                    "confidence": "high" if binding else "none",
+                }
+            )
+        return out
+
     # ------------------------------------------------------------------ assess
 
     async def assess(

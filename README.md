@@ -6,7 +6,17 @@ infra), replacing per-integration hand-rolled retries, rate-limit
 handling, and cost tracking with one shared reliability + governance
 layer.
 
-## Status: Phase 4 of 9
+## Status: Phases 1–9 complete (dashboard shipped)
+
+**Live dashboard:** start the server (`python -m uvicorn gateway.server:app`) and open
+`http://127.0.0.1:8000/dashboard` — a self-contained, zero-dependency page with KPIs,
+provider health, quota gauges, budget verdicts, spend breakdown, the reconciliation
+queue, and a live ledger feed. It reads the *same* engine instances the proxy path
+uses (never a divergent copy), backed by JSON APIs under `/v1/dashboard/*`:
+`overview`, `status`, `providers`, `quota`, `budget`, `spend`, `events`,
+`reconciliation`. With no API keys configured the server boots in **Dev Mode**
+(transport-layer fakes for every provider; all gateway engines run for real), so the
+whole system — including the dashboard — is demoable with zero credentials.
 
 Phase 1 shipped the Unified Event Ledger and an Anthropic adapter.
 Phase 2 fixed six defects found in Phase 1, added OpenAI and Gemini

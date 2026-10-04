@@ -13,14 +13,21 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from gateway.adapters.anthropic import AnthropicAdapter
+from gateway.adapters.gemini import GeminiAdapter
 from gateway.adapters.openai import OpenAIAdapter
 from gateway.adapters.rest import GenericRestAdapter
 from gateway.core.adapter import AdapterRequest, ProviderAdapter
 from gateway.core.executor import CallExecutor
 from gateway.core.types import CallOutcome
+from gateway.dashboard import add_dashboard_page, add_dashboard_routes
 from gateway.engines.auth import AuthLifecycleManager
 from gateway.engines.budget import BudgetEngine
-from gateway.engines.policy import OperationPolicy, PolicyConfig, PolicyEngine
+from gateway.engines.policy import (
+    OperationPolicy,
+    PolicyConfig,
+    PolicyEngine,
+    PolicyVerdict,
+)
 from gateway.engines.quota import QuotaEngine
 from gateway.engines.reconcile import ReconciliationEngine
 from gateway.engines.router import RoutingConfig, RoutingEngine, RoutingTarget
@@ -46,7 +53,8 @@ def _build_wiring(db_path: str) -> dict:
     # Dev Mode awareness: when no real credentials are configured, tell the
     # operator (loudly, once) that outbound HTTP is being faked at the
     # transport layer. Engines above it run 100% for real.
-    from gateway.devmode import describe as _describe_mode, dev_mode_enabled
+    from gateway.devmode import describe as _describe_mode
+    from gateway.devmode import dev_mode_enabled
 
     if dev_mode_enabled():
         logger.warning("GATEWAY STARTING IN %s", _describe_mode())
@@ -62,7 +70,7 @@ def _build_wiring(db_path: str) -> dict:
     policy_config = PolicyConfig(
         policies={
             "default": [OperationPolicy(allowed_providers="*", allowed_operations=[
-                "chat.completions.create", "chat", "messages.create", "generate_content",
+                "chat.completions.create", "chat", "messages.create", "generateContent",
             ])]
         }
     )
@@ -84,12 +92,15 @@ def _build_wiring(db_path: str) -> dict:
     # the server only reads generic env vars here.
     openai_api_key = os.getenv("OPENAI_API_KEY", "mock")
     anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "mock")
+    gemini_api_key = os.getenv("GEMINI_API_KEY", "mock")
 
     # Routing order = failover preference: OpenAI first, then Anthropic,
-    # then the generic REST adapter as the terminal fallback target.
+    # then Gemini, then the generic REST adapter as the terminal fallback
+    # target.
     adapters: list[ProviderAdapter] = [
         OpenAIAdapter(api_key=openai_api_key),
         AnthropicAdapter(api_key=anthropic_api_key),
+        GeminiAdapter(api_key=gemini_api_key),
         GenericRestAdapter(),
     ]
     for adapter in adapters:
@@ -104,6 +115,13 @@ def _build_wiring(db_path: str) -> dict:
         "reconcile": ReconciliationEngine(ledger=ledger),
         "auth": AuthLifecycleManager(),
         "ledger": ledger,
+        # Exposed for the Phase 9 dashboard's read-only views. These are the
+        # SAME engine instances the proxy path uses — the dashboard can never
+        # show a state the gateway itself isn't acting on.
+        "quota": quota_engine,
+        "budget": budget_engine,
+        "policy": policy_engine,
+        "validator": validator,
     }
 
 
@@ -111,6 +129,10 @@ def _build_wiring(db_path: str) -> dict:
 async def lifespan(app: FastAPI):
     db_path = os.getenv("GATEWAY_DB_PATH", "gateway.db")
     app_state.update(_build_wiring(db_path))
+    # Canonical reference for request handlers (including the dashboard's
+    # readiness checks) that survives shutdown cleanup, unlike the global
+    # dict which is cleared in the finally path below.
+    app.state.gateway_app_state = app_state
     reconcile_engine = app_state["reconcile"]
 
     # Background worker for stuck pending events
@@ -150,6 +172,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="API Reliability Platform", lifespan=lifespan)
 
+# Phase 9: read-only dashboard (HTML at /dashboard, JSON APIs under
+# /v1/dashboard/*). Mounted once; handlers resolve engines lazily through
+# app.state.gateway_app_state, which lifespan() populates — so importing
+# this module before startup is safe and the endpoints answer 503 until
+# the wiring exists.
+add_dashboard_routes(app)
+add_dashboard_page(app)
+
 
 class ProxyRequest(BaseModel):
     provider: str | None = None
@@ -177,16 +207,30 @@ async def proxy(request: ProxyRequest):
     )
 
     if request.provider:
-        target = next(
-            (t for t in router.targets if t.adapter.provider_name == request.provider), None
-        )
+        # Pinned dispatch: the caller chose their vendor. Target lookup and
+        # policy enforcement are delegated to the RoutingEngine so that ALL
+        # routing/policy semantics live in one provider-agnostic engine and
+        # the server never compares provider names itself (The One Rule).
+        # The pinned path enforces the same Policy gate as the routing
+        # chain — pinning a vendor must never bypass AuthZ/BOLA. Budget and
+        # quota accounting still apply inside the executor/ledger.
+        target = router.target_for(request.provider)
         if target is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Unknown provider '{request.provider}'. Registered: "
-                       f"{[t.adapter.provider_name for t in router.targets]}",
+                       f"{router.registered_providers()}",
             )
-        result = await target.executor.execute(adapter_req)
+
+        identity_key = target.executor.identity_key
+        assessment = await router.policy_assess(identity_key, request.provider, request.operation)
+        if assessment is not None and assessment.verdict is not PolicyVerdict.ALLOWED:
+            raise HTTPException(status_code=502, detail=f"Policy denial: {assessment.reason}")
+
+        # Canonical dispatch: feeds rate-limit/error observations back into
+        # the SAME QuotaEngine the routing chain uses, so pinned traffic is
+        # never invisible to quota tracking or the dashboard.
+        result = await target.execute_observed(adapter_req, app_state.get("quota"))
         validation = router.validator.validate(result)
         if result.succeeded and validation.verdict != ValidationVerdict.INVALID:
             response = result.response
