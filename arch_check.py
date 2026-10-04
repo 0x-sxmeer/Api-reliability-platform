@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 
 # Portable path: works on both Windows and POSIX checkouts.
 root = os.path.join("src", "gateway")
@@ -15,6 +16,19 @@ VENDOR_NAME = re.compile(r"""["'](openai|anthropic|gemini)["']""", re.IGNORECASE
 COMPARISON = re.compile(r"(?<!\w)provider(?:_name)?\s*==")
 ALLOWLIST = {os.path.join("src", "gateway", "core", "pricing.py")}
 
+# Reviewed exemptions — each entry is a deliberate, documented exception to the
+# regex gate, NOT an oversight. Keep this list honest: adding a file here is an
+# architecture decision that belongs in docs/interface-changes.md.
+#
+# devmode.py: fake transport that routes canned responses by URL host. It holds
+# no reliability/governance knowledge — it is test scaffolding at the transport
+# layer, and its host strings mirror the base URLs already declared inside
+# adapters/openai.py and adapters/anthropic.py. Exempted with justification per
+# audit remediation step 1 (Phase 5-8 changelog backfill).
+EXEMPT_FILES = {
+    os.path.join("src", "gateway", "devmode.py"),
+}
+
 violations = []
 for dirpath, dirnames, filenames in os.walk(root):
     if "adapters" in dirpath:
@@ -23,7 +37,8 @@ for dirpath, dirnames, filenames in os.walk(root):
         if not f.endswith(".py"):
             continue
         path = os.path.join(dirpath, f)
-        if os.path.normpath(path) in ALLOWLIST:
+        norm = os.path.normpath(path)
+        if norm in ALLOWLIST or norm in EXEMPT_FILES:
             continue
         with open(path, encoding="utf-8") as fh:
             raw_lines = fh.readlines()
@@ -40,6 +55,10 @@ if violations:
     print("ARCHITECTURE VIOLATIONS:")
     for v in violations:
         print(v)
+    # Fixes audit F-06: the gate previously printed violations but exited 0,
+    # making CI decorative. A gate that cannot fail is not a gate.
+    sys.exit(1)
 else:
     print("CLEAN: No architecture violations found outside adapters/")
+    sys.exit(0)
 

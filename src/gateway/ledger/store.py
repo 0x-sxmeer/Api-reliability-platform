@@ -234,6 +234,11 @@ class SqliteLedgerStore(LedgerStore):
     def _reconcile_sync(self, event_id: UUID, final_outcome: CallOutcome, reason: str, final_cost: float | None, final_error: ErrorCategory | None) -> None:
         conn = self._connect()
         try:
+            # Audit F-20 remediation: BEGIN IMMEDIATE takes the write lock
+            # up front. Without it, two concurrent settles of one event
+            # could BOTH read 'pending' before either UPDATE committed —
+            # last writer silently overwrote the first's settlement.
+            conn.execute("BEGIN IMMEDIATE")
             with conn:
                 # First fetch the existing row to verify it can be reconciled
                 row = conn.execute("SELECT outcome FROM events WHERE event_id = ?", (str(event_id),)).fetchone()

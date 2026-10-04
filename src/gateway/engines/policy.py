@@ -89,7 +89,10 @@ class PolicyEngine:
                 provider=provider,
                 operation=operation,
                 outcome=CallOutcome.FAILURE,
-                error_category=ErrorCategory.REQUIRES_HUMAN_ACTION,
+                # Audit F-15: was REQUIRES_HUMAN_ACTION — semantically wrong
+                # (that category means "needs 3DS/SCA"). Authz denial is a
+                # permanent condition, not a human-payment action.
+                error_category=ErrorCategory.AUTHZ_DENIED,
                 http_status=403,
             )
             await self._ledger.append(event)

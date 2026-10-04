@@ -37,6 +37,9 @@ class RoutingConfig:
     max_total_attempts: int = 4
     backoff_base_seconds: float = 1.0
     max_wait_seconds: float = 10.0
+    # Audit F-04 hardening: absolute ceiling on loop passes (waits + attempts),
+    # guaranteeing termination independent of clock/sleep behavior.
+    max_total_iterations: int = 32
     sleep_fn: Callable[[float], Awaitable[None]] = asyncio.sleep
 
 
@@ -90,10 +93,35 @@ class RoutingEngine:
     def validator(self) -> ResponseValidator:
         return self._validator
 
-    async def route(self, request: AdapterRequest) -> RoutingOutcome:
+    # Read-only accessors so a composition root (server.py) can apply the
+    # same gates on non-routed paths without touching private attributes
+    # (audit F-03: the provider-pinned proxy path must not bypass policy /
+    # budget / quota).
+    @property
+    def policy(self) -> PolicyEngine | None:
+        return self._policy
+
+    @property
+    def budget(self) -> BudgetEngine | None:
+        return self._budget
+
+    @property
+    def quota(self) -> QuotaEngine:
+        return self._quota
+
+    async def route(
+        self, request: AdapterRequest, identity_key: str | None = None
+    ) -> RoutingOutcome:
         """
         Attempt the request across registered targets according to policy.
         Returns the first VALID result, or the final outcome if all attempts are exhausted.
+
+        `identity_key` names the tenant this call is made FOR. Fixes audit F-05:
+        when omitted it falls back to the first target's executor identity for
+        backward compatibility, but that fallback is DEPRECATED — with multiple
+        tenants sharing one router, targets[0].executor.identity_key would
+        authorize/spend every request under whichever executor happens to be
+        registered first. Callers must pass the authenticated identity.
         """
         if not self._targets:
             raise ValueError("No routing targets registered.")
@@ -101,7 +129,13 @@ class RoutingEngine:
         # 0. Policy Gate (AuthZ)
         active_targets = self._targets
         if self._policy and self._targets:
-            identity_key = self._targets[0].executor.identity_key
+            if identity_key is None:
+                logger.warning(
+                    "router: route() called without identity_key; falling back to "
+                    "targets[0].executor identity. Pass identity_key explicitly for "
+                    "multi-tenant correctness (audit F-05)."
+                )
+                identity_key = self._targets[0].executor.identity_key
             allowed_targets = []
             auth_denial_reason = None
             
@@ -124,7 +158,10 @@ class RoutingEngine:
 
         # 1. Budget Gate
         if self._budget and active_targets:
-            identity_key = active_targets[0].executor.identity_key
+            if identity_key is None:
+                # No policy engine ran (identity not resolved yet) — same
+                # deprecated fallback as the policy gate (audit F-05).
+                identity_key = active_targets[0].executor.identity_key
             budget_assessment = await self._budget.assess(identity_key)
             if budget_assessment.verdict is Verdict.BLOCKED:
                 # Return an immediate blocked outcome
@@ -139,7 +176,30 @@ class RoutingEngine:
         fallback_validation: ValidationResult | None = None
         succeeded = False
 
+        # Fixes audit F-04: the BLOCKED-wait branch previously slept and looped
+        # WITHOUT charging anything against a ceiling — a target whose retry_at
+        # keeps landing inside the wait window could spin indefinitely (waits
+        # never increment total_attempts). Cumulative sleep time is now charged
+        # to max_wait_seconds, so route() always terminates.
+        #
+        # Hardening (this session): cumulative *loop iterations* are also
+        # capped. The sleep-deadline alone bounds wall-clock time only when
+        # every spin actually sleeps; a zero/near-zero wait (retry_at within
+        # milliseconds, or an injected sleep_fn that returns instantly in
+        # tests) would still allow thousands of re-assess spins per second.
+        # max_total_iterations gives a deterministic termination guarantee
+        # independent of clock behavior.
+        deadline_slept = 0.0
+        iterations = 0
+        max_iterations = self._config.max_total_iterations
+
         while total_attempts < self._config.max_total_attempts and target_idx < len(active_targets):
+            # Audit F-04 hardening: every pass through the loop (including pure
+            # re-assess spins after a wait) is charged against a fixed ceiling,
+            # so termination does not depend on clock behavior at all.
+            iterations += 1
+            if iterations > max_iterations:
+                break
             target = active_targets[target_idx]
             target_id = id(target)
 
@@ -155,10 +215,13 @@ class RoutingEngine:
                 # Can we wait?
                 if assessment.retry_at and assessment.retry_at > now:
                     wait_seconds = (assessment.retry_at - now).total_seconds()
-                    if wait_seconds <= self._config.max_wait_seconds:
+                    if wait_seconds <= self._config.max_wait_seconds and \
+                            (deadline_slept + wait_seconds) <= self._config.max_wait_seconds:
                         await self._config.sleep_fn(wait_seconds)
+                        deadline_slept += wait_seconds
                         # We do not count waiting as an attempt on the total limit or provider limit
-                        # until we actually try to execute. Since we slept, loop around to re-assess
+                        # until we actually try to execute. Since we slept, loop around to re-assess.
+                        # The cumulative sleep IS bounded by the deadline check above (audit F-04).
                         continue
                     else:
                         # Beyond wait budget, immediately fail over

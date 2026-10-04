@@ -87,6 +87,14 @@ class ErrorCategory(str, Enum):
     # must never be retried automatically, and needs its own ledger
     # state so it doesn't get counted as an error.
 
+    AUTHZ_DENIED = "authz_denied"
+    # Audit F-15 remediation: authorization denials were previously written
+    # to the ledger under REQUIRES_HUMAN_ACTION, which means "payment
+    # requires 3DS/SCA" — semantically wrong for authz. Denials are permanent
+    # conditions (retrying without a policy change cannot help); this value
+    # lets dashboards filter authz events precisely instead of string-matching
+    # http_status==403.
+
     UNKNOWN = "unknown"
     # The adapter couldn't classify it. Better to be honest about this
     # than to guess wrong and silently misroute.

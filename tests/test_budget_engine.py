@@ -30,10 +30,13 @@ async def test_budget_assessment_open_when_no_limits(tmp_path):
 async def test_budget_assessment_blocks_when_identity_limit_exceeded(tmp_path):
     ledger = SqliteLedgerStore(tmp_path / "test.db")
     # Seed ledger with $10 spend for team-a
+    # gpt-6-astra is a verified=True pricing row — without this, the F-09
+    # unverified-price guard correctly refuses enforcement (UNKNOWN).
     event = GatewayEvent(
         identity_key="team-a",
         provider="openai",
         operation="test",
+        raw_provider_metadata={"model": "gpt-6-astra"},
         outcome=CallOutcome.SUCCESS,
         cost_usd=10.0,
     )
@@ -57,6 +60,7 @@ async def test_budget_assessment_open_when_identity_under_limit(tmp_path):
         identity_key="team-a",
         provider="openai",
         operation="test",
+        raw_provider_metadata={"model": "gpt-6-astra"},
         outcome=CallOutcome.SUCCESS,
         cost_usd=2.0,
     )
@@ -78,6 +82,7 @@ async def test_budget_assessment_blocks_when_global_limit_exceeded(tmp_path):
         identity_key="team-x",
         provider="openai",
         operation="test",
+        raw_provider_metadata={"model": "gpt-6-astra"},
         outcome=CallOutcome.SUCCESS,
         cost_usd=20.0,
     )
@@ -146,3 +151,51 @@ async def test_budget_record_waste(tmp_path):
     
     wasted = await engine.record_waste(outcome)
     assert wasted == 5.6  # 2.5 + 3.1
+
+
+@pytest.mark.asyncio
+async def test_budget_refuses_enforcement_on_unverified_price(tmp_path):
+    """Audit F-08/F-09 regression: spend computed from a model whose
+    price row is not verified=True must yield UNKNOWN, never a confident
+    BLOCKED/OPEN built on guessed numbers."""
+    ledger = SqliteLedgerStore(tmp_path / "test.db")
+    await ledger.append(GatewayEvent(
+        identity_key="team-a", provider="openai", operation="test",
+        raw_provider_metadata={"model": "totally-made-up-model"}, outcome=CallOutcome.SUCCESS,
+        cost_usd=10.0,  # hypothetical cost attached to an unpriced model
+    ))
+    engine = BudgetEngine(ledger, BudgetConfig(identity_monthly_usd={"team-a": 5.0}))
+    assessment = await engine.assess("team-a")
+    assert assessment.verdict == Verdict.UNKNOWN
+    assert "not verified" in assessment.block_reason or "no price row" in assessment.block_reason
+
+
+@pytest.mark.asyncio
+async def test_budget_open_with_caveat_when_unpriced_success_exists(tmp_path):
+    """Audit F-09 regression: a SUCCESS event with cost_usd=None (model
+    has no price entry) must NOT render as confident $0 spend — headroom
+    carries a caveat naming the unpriced call count."""
+    ledger = SqliteLedgerStore(tmp_path / "test.db")
+    await ledger.append(GatewayEvent(
+        identity_key="team-a", provider="openai", operation="test",
+        raw_provider_metadata={"model": "unpriced-model-xyz"}, outcome=CallOutcome.SUCCESS,
+        cost_usd=None,
+    ))
+    engine = BudgetEngine(ledger, BudgetConfig(identity_monthly_usd={"team-a": 5.0}))
+    assessment = await engine.assess("team-a")
+    assert assessment.verdict == Verdict.OPEN
+    assert assessment.cost_headroom == 5.0  # lower bound only...
+    assert assessment.caveat is not None and "no \n" not in assessment.caveat
+    assert "price entry" in assessment.caveat
+
+
+@pytest.mark.asyncio
+async def test_budget_headroom_is_finite_or_none_never_inf(tmp_path):
+    """Audit finding: float('inf') leaked into JSON APIs. Headroom must
+    be None when unlimited, finite when capped."""
+    import json
+    ledger = SqliteLedgerStore(tmp_path / "test.db")
+    engine = BudgetEngine(ledger, BudgetConfig(global_monthly_usd=10.0))
+    a = await engine.assess("team-a")
+    assert a.cost_headroom == 10.0
+    json.dumps({"headroom": a.cost_headroom})  # would raise for inf under strict mode

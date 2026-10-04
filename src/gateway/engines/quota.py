@@ -194,6 +194,14 @@ class QuotaConfig:
     default_cooldown: timedelta = timedelta(seconds=30)
     # Cooldown for a RATE_LIMITED error that states no retry-after.
     probe: ProbePolicy = field(default_factory=ProbePolicy)
+    # Fixes audit F-16 (author-flagged "no eviction" open item): per-bucket
+    # state is keyed by adapter.quota_bucket(), which for OpenAI/Anthropic is
+    # the caller-supplied model string. Unbounded dict growth let any client
+    # exhaust memory by varying model names. On insert beyond this cap we
+    # evict entries whose state is entirely stale (no observation/cooldown/
+    # exhaustion newer than `stale_after_no_reset`); if nothing is evictable
+    # we refuse to grow further and log — bounded memory, never unbounded.
+    max_tracked_buckets: int = 4096
 
 
 @dataclass(frozen=True)
@@ -414,6 +422,61 @@ class QuotaEngine:
             raise ValueError(f"adapter {adapter.provider_name!r} is not registered with this QuotaEngine")
         return QuotaKey(adapter.provider_name, adapter.quota_bucket(request))
 
+    # ------------------------------------------------------------- state bounds
+
+    def _state_is_stale(self, st: _KeyState, now: datetime) -> bool:
+        """True when nothing in this bucket's state still carries information.
+
+        An observation counts as live only within the same freshness windows
+        assess() itself would trust it: reset_at-relative observations are dead
+        once reset_at has passed; no-reset observations expire after
+        stale_after_no_reset. Cooldowns/exhaustions with future timestamps are
+        always live (they actively gate routing decisions)."""
+        horizon = self._config.stale_after_no_reset
+        for obs in st.observations.values():
+            reset = obs.snapshot.reset_at
+            if reset is not None:
+                if reset > now:
+                    return False
+            elif (now - obs.at) < horizon:
+                return False
+        if st.cooldown_until is not None and st.cooldown_until > now:
+            return False
+        if st.exhaustion is not None:
+            if (st.exhaustion.next_probe_at is None or st.exhaustion.next_probe_at > now):
+                return False
+            if st.exhaustion.resume_at is None or st.exhaustion.resume_at > now:
+                return False
+        return True
+
+    def _get_or_create_state(self, key: QuotaKey, now: datetime) -> _KeyState:
+        """Bounded-growth accessor for per-bucket state (audit F-16 fix).
+
+        Under the cap this behaves exactly like setdefault(). Over the cap we
+        first try to evict fully-stale entries; if none are evictable we reuse
+        a throwaway empty state rather than growing the dict — memory stays
+        bounded under a model-name-flooding caller, at the cost of tracking
+        for NEW buckets only (existing buckets keep working normally)."""
+        state = self._states.get(key)
+        if state is not None:
+            return state
+        if len(self._states) >= self._config.max_tracked_buckets:
+            stale = [k for k, s in self._states.items() if self._state_is_stale(s, now)]
+            for k in stale:
+                del self._states[k]
+            if len(self._states) >= self._config.max_tracked_buckets:
+                logger.warning(
+                    "quota_engine: tracked-bucket cap (%d) reached and nothing is "
+                    "evictable; NOT creating state for new bucket %r — its quota "
+                    "will be assessed as UNKNOWN until an existing entry expires.",
+                    self._config.max_tracked_buckets,
+                    key.bucket,
+                )
+                return _KeyState()
+        state = _KeyState()
+        self._states[key] = state
+        return state
+
     # ----------------------------------------------------------------- observe
 
     def observe(
@@ -438,7 +501,7 @@ class QuotaEngine:
         """
         key = self._key(adapter, request)
         now = _utc(at, "at") if at is not None else _utc(self._clock(), "clock()")
-        state = self._states.setdefault(key, _KeyState())
+        state = self._get_or_create_state(key, now)
 
         if snapshot is not None:
             for view in (snapshot, *snapshot.additional_scopes):
