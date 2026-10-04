@@ -1,0 +1,41 @@
+name: CI — pytest + ruff + arch gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install project + dev tooling
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f pyproject.toml ]; then pip install -e ".[dev]" 2>/dev/null || pip install -e .; fi
+          pip install pytest ruff
+
+      # Gate 1: architecture purity ("The One Rule") — vendor logic only in adapters/
+      - name: Arch check (The One Rule)
+        run: python arch_check.py
+
+      # Gate 2: static analysis
+      - name: Ruff
+        run: ruff check src/ tests/ examples/ *.py
+
+      # Gate 3: full test suite (pytest.ini already disables the broken libtmux plugin)
+      - name: Tests
+        run: python -m pytest tests/ -q --tb=short
+
+      # Smoke: end-to-end simulation scenarios 1-4
+      - name: E2E simulation
+        run: python simulate_traffic.py

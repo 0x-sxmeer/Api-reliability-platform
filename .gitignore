@@ -2,9 +2,9 @@
 __pycache__/
 *.pyc
 
-# Egg-info and build artifacts
-src/gateway.egg-info/
-*.egg-info/
+# Coverage and test artifacts
+.coverage
+.pytest_cache/
 
 # Database files
 *.db

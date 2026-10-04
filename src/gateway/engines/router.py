@@ -81,6 +81,15 @@ class RoutingEngine:
         """Register a target for the routing pool."""
         self._targets.append(target)
 
+    @property
+    def targets(self) -> tuple[RoutingTarget, ...]:
+        """Read-only view of registered targets (in failover preference order)."""
+        return tuple(self._targets)
+
+    @property
+    def validator(self) -> ResponseValidator:
+        return self._validator
+
     async def route(self, request: AdapterRequest) -> RoutingOutcome:
         """
         Attempt the request across registered targets according to policy.
