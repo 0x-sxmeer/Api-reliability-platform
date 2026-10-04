@@ -44,6 +44,28 @@ def test_send_requires_model_in_extra(adapter: GeminiAdapter) -> None:
         asyncio.run(adapter.send(AdapterRequest(operation="generateContent", payload={})))
 
 
+def test_send_accepts_model_in_payload_as_fallback(adapter: GeminiAdapter) -> None:
+    """Canonical location is extra["model"], but gateway clients naturally
+    put the model in the OpenAI-style payload. send() must accept that too
+    instead of hard-failing (previously broke every pinned Gemini call)."""
+    import asyncio
+
+    resp = asyncio.run(
+        adapter.send(
+            AdapterRequest(
+                operation="generateContent",
+                payload={"contents": [], "model": "gemini-2.0-flash"},
+            )
+        )
+    )
+    assert resp.status_code == 200
+
+
+def test_quota_bucket_falls_back_to_payload_model(adapter: GeminiAdapter) -> None:
+    req = AdapterRequest(operation="generateContent", payload={"model": "m-payload"})
+    assert adapter.quota_bucket(req) == "m-payload"
+
+
 def test_rate_limit_headers_are_always_none_quality(adapter: GeminiAdapter) -> None:
     """The single most important Gemini-specific fact: generateContent
     documents NO rate-limit headers on any response, ever. This must

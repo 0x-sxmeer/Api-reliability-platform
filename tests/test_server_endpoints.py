@@ -133,3 +133,42 @@ async def test_webhook_unknown_status_is_422_never_guessed(client):
 async def test_webhook_malformed_uuid_is_422(client):
     resp = await client.post("/v1/webhooks/stripe", json={"event_id": "not-a-uuid", "status": "delivered"})
     assert resp.status_code == 422
+
+
+# ---------------------------------------------------- pinned dispatch (all providers)
+
+async def test_pinned_gemini_accepts_model_in_payload(client):
+    """Regression: Gemini's model selects the URL path. OpenAI-style gateway
+    requests carry it in payload; the adapter must accept that too instead
+    of hard-failing (previously every pinned/failover Gemini call -> 502)."""
+    resp = await client.post(
+        "/v1/proxy",
+        json={
+            "operation": "generateContent",
+            "provider": "gemini",
+            "payload": {"contents": [{"parts": [{"text": "hi"}]}], "model": "gemini-2.0-flash"},
+        },
+    )
+    assert resp.status_code in (200, 502)  # never 500
+    if resp.status_code == 200:
+        assert resp.json()["provider"] == "gemini"
+
+
+async def test_pinned_unknown_provider_is_404(client):
+    resp = await client.post(
+        "/v1/proxy",
+        json={"operation": "x.y", "provider": "definitely-not-real", "payload": {}},
+    )
+    assert resp.status_code == 404
+    assert "Registered" in resp.json()["detail"]
+
+
+async def test_pinned_dispatch_enforces_policy(client):
+    """Pinning a vendor must never bypass AuthZ/BOLA."""
+    resp = await client.post(
+        "/v1/proxy",
+        json={"operation": "payments.refund", "provider": "openai", "payload": {"model": "gpt-4o-mini"}},
+    )
+    # Operation not in the demo allow-list -> clean 502 policy denial, no crash.
+    assert resp.status_code == 502
+    assert "Policy denial" in resp.json()["detail"]

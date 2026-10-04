@@ -139,8 +139,14 @@ class GeminiAdapter(ProviderAdapter):
         # alias and a version for one model splits its ledger count across
         # two buckets and UNDER-counts (the unsafe direction for ledger-
         # derived headroom). Use one spelling per model.
-        model = request.extra.get("model") if isinstance(request.extra, dict) else None
-        return model if isinstance(model, str) and model else "unknown-model"
+        # Model may arrive in `extra` (canonical — it selects the URL path)
+        # or in `payload` (OpenAI-style bodies). Accept both so quota
+        # bucketing matches whatever send() can actually dispatch on.
+        for source in (request.extra, request.payload):
+            model = source.get("model") if isinstance(source, dict) else None
+            if isinstance(model, str) and model:
+                return model
+        return "unknown-model"
 
     def quota_windows(self) -> tuple[QuotaWindow, ...]:
         # Gemini returns no rate-limit headers (VERIFIED-absence), so the
@@ -171,7 +177,12 @@ class GeminiAdapter(ProviderAdapter):
                 f"GeminiAdapter does not handle operation '{request.operation}'. "
                 "Known: generateContent"
             )
-        model = request.extra.get("model")
+        # Canonical location is extra["model"] (it selects the URL path);
+        # payload["model"] is accepted as a fallback so OpenAI-style
+        # gateway requests route correctly instead of hard-failing.
+        model = request.extra.get("model") or (
+            request.payload.get("model") if isinstance(request.payload, dict) else None
+        )
         if not model:
             raise ValueError(
                 "GeminiAdapter requires request.extra['model'] (e.g. 'gemini-2.5-flash') "
