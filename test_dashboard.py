@@ -8,11 +8,13 @@ async def test_dashboard():
     
     async with lifespan(app):
         # We need to simulate some traffic first to put data in the ledger
-        import simulate_traffic
-        await simulate_traffic.run_simulation()
-        print("\n--- TRAFFIC INJECTED, FETCHING DASHBOARD DATA ---")
-        
+        # Instead of calling run_simulation, we just hit the proxy endpoints
+        print("\n--- INJECTING TRAFFIC ---")
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.post("/v1/proxy", json={"operation": "chat.completions.create", "payload": {"model": "gpt-4", "messages": [{"role": "user", "content": "Hi"}]}})
+            await client.post("/v1/proxy", json={"operation": "dangerous_operation", "payload": {}})
+            
+            print("\n--- TRAFFIC INJECTED, FETCHING DASHBOARD DATA ---")
             
             # Fetch the Overview KPI endpoint
             resp1 = await client.get("/v1/dashboard/overview")
