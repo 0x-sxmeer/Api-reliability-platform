@@ -110,6 +110,33 @@ _PRICES: dict[tuple[str, str], ModelPrice] = {
         source="https://ai.google.dev/pricing",
         verified=True,
     ),
+    ("openai", "gpt-4o-mini"): ModelPrice(
+        # Used by the Dev-Mode fake and the demo traffic; standard-tier list
+        # price. Entry added for Phase 9 so dashboard cost panels show real
+        # dollar figures instead of $0/None during zero-key demos.
+        input_per_mtok=0.075,
+        output_per_mtok=0.30,
+        cached_input_per_mtok=0.0375,
+        source="https://platform.openai.com/docs/pricing",
+        verified=True,
+        note="Demo model (dev-mode fixture reports gpt-4o-mini).",
+    ),
+    ("anthropic", "claude-sonnet-4-20250514"): ModelPrice(
+        input_per_mtok=3.00,
+        output_per_mtok=15.00,
+        cached_input_per_mtok=0.30,
+        source="https://docs.anthropic.com/en/docs/pricing",
+        verified=True,
+        note="Full dated model id used verbatim by the dev-mode fixture.",
+    ),
+    ("gemini", "gemini-flash-latest"): ModelPrice(
+        input_per_mtok=0.15,
+        output_per_mtok=0.60,
+        cached_input_per_mtok=0.0375,
+        source="https://ai.google.dev/pricing",
+        verified=False,
+        note="Dev-mode gemini fixture model id; flash-lite tier numbers.",
+    ),
 }
 
 

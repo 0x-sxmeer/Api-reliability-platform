@@ -109,7 +109,12 @@ class GeminiAdapter(ProviderAdapter):
 
     def __init__(self, api_key: str, *, http_client: httpx.AsyncClient | None = None) -> None:
         self._api_key = api_key
-        self._http = http_client or httpx.AsyncClient(base_url=GEMINI_API_BASE)
+        if http_client is not None:
+            self._http = http_client
+        else:
+            from gateway.devmode import make_http_client
+
+            self._http = make_http_client(GEMINI_API_BASE)
 
     @property
     def provider_name(self) -> str:

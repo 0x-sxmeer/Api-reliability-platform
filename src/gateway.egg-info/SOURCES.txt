@@ -1,6 +1,7 @@
 README.md
 pyproject.toml
 src/gateway/__init__.py
+src/gateway/devmode.py
 src/gateway/server.py
 src/gateway.egg-info/PKG-INFO
 src/gateway.egg-info/SOURCES.txt
@@ -35,6 +36,7 @@ src/gateway/ledger/migrations/0004_quota_bucket.sql
 src/gateway/ledger/migrations/0005_reconciliation_columns.sql
 src/gateway/ledger/migrations/__init__.py
 tests/test_anthropic_adapter.py
+tests/test_auth_lifecycle.py
 tests/test_budget_engine.py
 tests/test_executor.py
 tests/test_gemini_adapter.py
@@ -45,5 +47,7 @@ tests/test_policy_engine.py
 tests/test_quota_engine.py
 tests/test_quota_integration.py
 tests/test_reconciliation_engine.py
+tests/test_rest_adapter.py
 tests/test_router_engine.py
+tests/test_server_endpoints.py
 tests/test_validator_engine.py

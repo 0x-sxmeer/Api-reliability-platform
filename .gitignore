@@ -1,15 +1,14 @@
-# Python bytecode caches
+# Python bytecode and caches
 __pycache__/
 *.pyc
 
-# Runtime SQLite artifact - schema lives in src/gateway/ledger/migrations.py,
-# so the DB file must never be committed (it churns on every test/sim run).
-gateway.db
-*.db
-
-# Test / lint caches
-.pytest_cache/
-.ruff_cache/
+# Coverage reports
 .coverage
 htmlcov/
-.env
+coverage/
+
+# Database files
+*.db
+
+# Egg-info directories
+*.egg-info/
