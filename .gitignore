@@ -2,5 +2,11 @@
 __pycache__/
 *.pyc
 
-# Package distribution artifacts
+# Package metadata
 *.egg-info/
+
+# Secrets (never commit real API keys)
+.env
+
+# SQLite database files
+*.db

@@ -152,7 +152,7 @@ def _gemini_transport() -> httpx.MockTransport:
                         "candidatesTokenCount": 5,
                         "cachedContentTokenCount": 0,
                     },
-                    "modelVersion": "gemini-2.5-flash",
+                    "modelVersion": "gemini-3.8-flash",
                 },
             )
         if calls["n"] == 2:
@@ -235,7 +235,7 @@ def build_request(provider: str) -> AdapterRequest:
         return AdapterRequest(
             operation="generateContent",
             payload={"contents": [{"parts": [{"text": "Say hello in one sentence."}]}]},
-            extra={"model": "gemini-2.5-flash"},
+            extra={"model": "gemini-3.8-flash"},
         )
     raise ValueError(provider)
 

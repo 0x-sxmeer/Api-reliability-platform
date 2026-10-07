@@ -105,7 +105,13 @@ def _next_daily_reset(now: datetime) -> datetime | None:
 
 
 class GeminiAdapter(ProviderAdapter):
-    """Adapter for the Gemini `generateContent` REST API."""
+    """Adapter for the Gemini `generateContent` REST API.
+
+    Dev-mode note: when GATEWAY_FAKE_APIS=1 is set explicitly, the fake
+    transport intercepts by URL host, so Gemini is faked too even though
+    dev_mode_enabled() itself only keys off OpenAI/Anthropic creds.
+    Without that flag, a real key here means live calls. (See devmode.)
+    """
 
     def __init__(self, api_key: str, *, http_client: httpx.AsyncClient | None = None) -> None:
         self._api_key = api_key
@@ -174,7 +180,7 @@ class GeminiAdapter(ProviderAdapter):
         model = request.extra.get("model")
         if not model:
             raise ValueError(
-                "GeminiAdapter requires request.extra['model'] (e.g. 'gemini-2.5-flash') "
+                "GeminiAdapter requires request.extra['model'] (e.g. 'gemini-3.8-flash') "
                 "since, unlike Anthropic/OpenAI, the model selects the URL path, not a "
                 "payload field."
             )
