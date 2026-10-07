@@ -283,9 +283,9 @@ class SqliteLedgerStore(LedgerStore):
                     INSERT INTO events (
                         event_id, timestamp, identity_key, provider, operation,
                         outcome, error_category, http_status, provider_request_id,
-                        latency_ms, cost_usd, raw_provider_metadata, quota_bucket,
+                        latency_ms, cost_usd, input_tokens, output_tokens, raw_provider_metadata, quota_bucket,
                         reconciled_at, reconciled_reason, original_outcome
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(event.event_id),
@@ -299,6 +299,8 @@ class SqliteLedgerStore(LedgerStore):
                         event.provider_request_id,
                         event.latency_ms,
                         event.cost_usd,
+                        event.input_tokens,
+                        event.output_tokens,
                         json.dumps(event.raw_provider_metadata),
                         event.quota_bucket,
                         event.reconciled_at.isoformat() if event.reconciled_at else None,
@@ -410,6 +412,8 @@ class SqliteLedgerStore(LedgerStore):
             provider_request_id=row["provider_request_id"],
             latency_ms=row["latency_ms"],
             cost_usd=row["cost_usd"],
+            input_tokens=row["input_tokens"] if "input_tokens" in row.keys() else None,
+            output_tokens=row["output_tokens"] if "output_tokens" in row.keys() else None,
             raw_provider_metadata=json.loads(row["raw_provider_metadata"]),
             quota_bucket=row["quota_bucket"],
             # NOTE: sqlite3.Row does NOT support .get(); use index access plus
