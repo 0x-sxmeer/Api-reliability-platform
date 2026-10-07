@@ -31,6 +31,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from gateway.adapters.anthropic import AnthropicAdapter
+from gateway.adapters.gemini import GeminiAdapter
 from gateway.adapters.openai import OpenAIAdapter
 from gateway.adapters.rest import GenericRestAdapter
 from gateway.core.adapter import AdapterRequest, ProviderAdapter
@@ -150,12 +151,15 @@ def _build_wiring(db_path: str) -> dict:
     # the server only reads generic env vars here.
     openai_api_key = os.getenv("OPENAI_API_KEY", "mock")
     anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "mock")
+    gemini_api_key = os.getenv("GEMINI_API_KEY", "mock")
 
     # Routing order = failover preference: OpenAI first, then Anthropic,
-    # then the generic REST adapter as the terminal fallback target.
+    # then Gemini, then the generic REST adapter as the terminal fallback
+    # target.
     adapters: list[ProviderAdapter] = [
         OpenAIAdapter(api_key=openai_api_key),
         AnthropicAdapter(api_key=anthropic_api_key),
+        GeminiAdapter(api_key=gemini_api_key),
         GenericRestAdapter(),
     ]
     for adapter in adapters:
