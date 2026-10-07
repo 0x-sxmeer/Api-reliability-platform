@@ -6,7 +6,7 @@ infra), replacing per-integration hand-rolled retries, rate-limit
 handling, and cost tracking with one shared reliability + governance
 layer.
 
-## Status: Phase 4 of 9
+## Status: Active Development (Phase 4 of 9)
 
 Phase 1 shipped the Unified Event Ledger and an Anthropic adapter.
 Phase 2 fixed six defects found in Phase 1, added OpenAI and Gemini
