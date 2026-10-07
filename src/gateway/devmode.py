@@ -169,11 +169,21 @@ class FakeAPIResponses(httpx.AsyncBaseTransport):
 
 
 def dev_mode_enabled() -> bool:
-    """True when fake APIs should be used (explicit flag, or missing creds)."""
+    """True when fake APIs should be used (explicit flag, or missing creds).
+
+    Auto-detection considers every provider the fake transport can serve
+    (see _FIXTURES / host routing below): if ANY real vendor key is set,
+    we switch to live mode entirely rather than run a confusing mix of
+    live and faked providers behind one gateway. Operators who want that
+    mix must opt in explicitly with GATEWAY_FAKE_APIS=1.
+    """
     flag = os.getenv("GATEWAY_FAKE_APIS")
     if flag is not None:
         return flag != "0"
-    return os.getenv("OPENAI_API_KEY", "") in ("", "mock")
+    for var in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"):
+        if os.getenv(var, "") not in ("", "mock"):
+            return False
+    return True
 
 
 def make_http_client(base_url: str) -> httpx.AsyncClient:
