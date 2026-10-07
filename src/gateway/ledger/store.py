@@ -284,8 +284,9 @@ class SqliteLedgerStore(LedgerStore):
                         event_id, timestamp, identity_key, provider, operation,
                         outcome, error_category, http_status, provider_request_id,
                         latency_ms, cost_usd, raw_provider_metadata, quota_bucket,
-                        reconciled_at, reconciled_reason, original_outcome
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        reconciled_at, reconciled_reason, original_outcome,
+                        input_tokens, output_tokens
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(event.event_id),
@@ -304,6 +305,8 @@ class SqliteLedgerStore(LedgerStore):
                         event.reconciled_at.isoformat() if event.reconciled_at else None,
                         event.reconciled_reason,
                         event.original_outcome.value if event.original_outcome else None,
+                        event.input_tokens,
+                        event.output_tokens,
                     ),
                 )
         finally:
@@ -410,6 +413,8 @@ class SqliteLedgerStore(LedgerStore):
             provider_request_id=row["provider_request_id"],
             latency_ms=row["latency_ms"],
             cost_usd=row["cost_usd"],
+            input_tokens=row["input_tokens"],
+            output_tokens=row["output_tokens"],
             raw_provider_metadata=json.loads(row["raw_provider_metadata"]),
             quota_bucket=row["quota_bucket"],
             # NOTE: sqlite3.Row does NOT support .get(); use index access plus

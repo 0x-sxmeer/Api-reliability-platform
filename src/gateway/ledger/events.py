@@ -62,6 +62,8 @@ class GatewayEvent(BaseModel):
 
     latency_ms: float | None = None
     cost_usd: float | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
 
     # --- Phase 7: Reconciliation ---
     reconciled_at: datetime | None = None
