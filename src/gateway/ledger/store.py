@@ -283,14 +283,8 @@ class SqliteLedgerStore(LedgerStore):
                     INSERT INTO events (
                         event_id, timestamp, identity_key, provider, operation,
                         outcome, error_category, http_status, provider_request_id,
-<<<<<<< HEAD
                         latency_ms, cost_usd, input_tokens, output_tokens, raw_provider_metadata, quota_bucket,
                         reconciled_at, reconciled_reason, original_outcome
-=======
-                        latency_ms, cost_usd, raw_provider_metadata, quota_bucket,
-                        reconciled_at, reconciled_reason, original_outcome,
-                        input_tokens, output_tokens
->>>>>>> origin/gemini-api-key-provided-96531
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
@@ -312,8 +306,6 @@ class SqliteLedgerStore(LedgerStore):
                         event.reconciled_at.isoformat() if event.reconciled_at else None,
                         event.reconciled_reason,
                         event.original_outcome.value if event.original_outcome else None,
-                        event.input_tokens,
-                        event.output_tokens,
                     ),
                 )
         finally:
